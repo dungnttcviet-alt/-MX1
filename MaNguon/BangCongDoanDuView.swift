@@ -1,6 +1,6 @@
 import UIKit
 
-final class BangCongDoanDuView: UIView, UITableViewDataSource {
+final class BangCongDoanDuView: UIView, UITableViewDataSource, UITableViewDelegate {
     private let bang = UITableView(frame: .zero, style: .plain)
     private var danhSach: [CongDoanDu] = []
 
@@ -11,10 +11,11 @@ final class BangCongDoanDuView: UIView, UITableViewDataSource {
         clipsToBounds = true
 
         bang.dataSource = self
+        bang.delegate = self
         bang.isScrollEnabled = true
         bang.alwaysBounceVertical = true
         bang.separatorStyle = .singleLine
-        bang.rowHeight = 36
+        bang.rowHeight = 40
         bang.sectionHeaderHeight = 38
         bang.backgroundColor = .clear
         bang.translatesAutoresizingMaskIntoConstraints = false
@@ -42,19 +43,19 @@ final class BangCongDoanDuView: UIView, UITableViewDataSource {
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        taoHang(trai: "Loại công đoạn", phai: "Số tờ", dam: true)
+        taoHang(trai: "Loại công đoạn", phai: "Số tờ", dam: true, hienMuiTen: true)
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let ma = "DongCongDoanDu"
         let o = tableView.dequeueReusableCell(withIdentifier: ma) ?? UITableViewCell(style: .default, reuseIdentifier: ma)
-        o.selectionStyle = .none
         o.backgroundColor = .clear
+        o.accessoryType = .disclosureIndicator
         o.contentView.subviews.forEach { $0.removeFromSuperview() }
 
         if danhSach.isEmpty {
             let trong = UILabel()
-            trong.text = "Chưa có công đoạn dư"
+            trong.text = "Chưa có dữ liệu - chạm để nhập"
             trong.textColor = .secondaryLabel
             trong.textAlignment = .center
             trong.translatesAutoresizingMaskIntoConstraints = false
@@ -67,7 +68,12 @@ final class BangCongDoanDuView: UIView, UITableViewDataSource {
             ])
         } else {
             let dong = danhSach[indexPath.row]
-            let hang = taoHang(trai: "\(dong.heSo.chuoiGon)%", phai: dong.soLuong.chuoiGon, dam: false)
+            let hang = taoHang(
+                trai: "\(dong.heSo.chuoiGon)%",
+                phai: dong.soLuong.chuoiGon,
+                dam: false,
+                hienMuiTen: false
+            )
             hang.translatesAutoresizingMaskIntoConstraints = false
             o.contentView.addSubview(hang)
             NSLayoutConstraint.activate([
@@ -80,7 +86,31 @@ final class BangCongDoanDuView: UIView, UITableViewDataSource {
         return o
     }
 
-    private func taoHang(trai: String, phai: String, dam: Bool) -> UIView {
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        moBangQuanLy()
+    }
+
+    private func moBangQuanLy() {
+        guard let manHinh = timManHinhCha() else { return }
+        let quanLy = ManHinhTonCongDoan { [weak self] in
+            self?.ganDanhSach(KhoCongDoanDu.dungChung.danhSach)
+        }
+        let dieuHuong = UINavigationController(rootViewController: quanLy)
+        dieuHuong.modalPresentationStyle = .fullScreen
+        manHinh.present(dieuHuong, animated: true)
+    }
+
+    private func timManHinhCha() -> UIViewController? {
+        var doiTuong: UIResponder? = self
+        while let hienTai = doiTuong {
+            if let manHinh = hienTai as? UIViewController { return manHinh }
+            doiTuong = hienTai.next
+        }
+        return nil
+    }
+
+    private func taoHang(trai: String, phai: String, dam: Bool, hienMuiTen: Bool) -> UIView {
         let khung = UIView()
         khung.backgroundColor = dam ? UIColor.tertiarySystemGroupedBackground : .clear
 
@@ -100,6 +130,7 @@ final class BangCongDoanDuView: UIView, UITableViewDataSource {
             khung.addSubview($0)
         }
 
+        let lePhai: CGFloat = hienMuiTen ? -22 : -6
         NSLayoutConstraint.activate([
             vach.centerXAnchor.constraint(equalTo: khung.centerXAnchor),
             vach.topAnchor.constraint(equalTo: khung.topAnchor),
@@ -110,7 +141,7 @@ final class BangCongDoanDuView: UIView, UITableViewDataSource {
             nhanTrai.topAnchor.constraint(equalTo: khung.topAnchor),
             nhanTrai.bottomAnchor.constraint(equalTo: khung.bottomAnchor),
             nhanPhai.leadingAnchor.constraint(equalTo: vach.trailingAnchor, constant: 6),
-            nhanPhai.trailingAnchor.constraint(equalTo: khung.trailingAnchor, constant: -6),
+            nhanPhai.trailingAnchor.constraint(equalTo: khung.trailingAnchor, constant: lePhai),
             nhanPhai.topAnchor.constraint(equalTo: khung.topAnchor),
             nhanPhai.bottomAnchor.constraint(equalTo: khung.bottomAnchor)
         ])
