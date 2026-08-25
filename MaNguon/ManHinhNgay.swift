@@ -95,8 +95,7 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         noiDung.translatesAutoresizingMaskIntoConstraints = false
 
         [
-            taoHang("Giờ vào", batDau),
-            taoHang("Giờ về", ketThuc),
+            taoHangGio(),
             taoHang("Nghỉ làm", nghi),
             taoHang("Phút chuẩn", phutChuan),
             tieuDeCot,
@@ -147,6 +146,7 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         oNhap.borderStyle = .roundedRect
         oNhap.keyboardType = .decimalPad
         oNhap.placeholder = goiY
+        oNhap.textAlignment = .center
         oNhap.delegate = self
         oNhap.addTarget(self, action: #selector(duLieuThayDoi), for: .editingChanged)
 
@@ -181,6 +181,32 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         nhan.textAlignment = .center
         nhan.adjustsFontSizeToFitWidth = true
         nhan.minimumScaleFactor = 0.75
+        return nhan
+    }
+
+    private func taoHangGio() -> UIStackView {
+        let nhomVao = UIStackView(arrangedSubviews: [taoNhanGio("Giờ vào"), batDau])
+        let nhomVe = UIStackView(arrangedSubviews: [taoNhanGio("Giờ về"), ketThuc])
+
+        [nhomVao, nhomVe].forEach {
+            $0.axis = .vertical
+            $0.alignment = .center
+            $0.spacing = 6
+        }
+
+        let hang = UIStackView(arrangedSubviews: [nhomVao, nhomVe])
+        hang.axis = .horizontal
+        hang.distribution = .fillEqually
+        hang.alignment = .center
+        hang.spacing = 16
+        return hang
+    }
+
+    private func taoNhanGio(_ noiDung: String) -> UILabel {
+        let nhan = UILabel()
+        nhan.text = noiDung
+        nhan.font = .systemFont(ofSize: 16, weight: .semibold)
+        nhan.textAlignment = .center
         return nhan
     }
 
