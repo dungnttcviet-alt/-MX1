@@ -227,10 +227,6 @@ final class ManHinhTonCongDoan: UIViewController, UITextFieldDelegate {
     }
 
     private func taoBanPhim() {
-        let cham = UITapGestureRecognizer(target: self, action: #selector(tatBanPhim))
-        cham.cancelsTouchesInView = false
-        view.addGestureRecognizer(cham)
-
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(banPhimHien(_:)),
