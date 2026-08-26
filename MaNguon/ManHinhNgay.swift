@@ -4,6 +4,7 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
     private var duLieu: DuLieuNgay
     private let ngay: Date
     private let khiDong: () -> Void
+
     private let cuon = UIScrollView()
     private let noiDung = UIStackView()
     private let batDau = UIDatePicker()
@@ -11,6 +12,7 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
     private let nghi = UISwitch()
     private let phutChuan = UITextField()
     private let danhSach = UIStackView()
+    private let tongKetQuaCongDoan = UILabel()
     private let ketQua = UILabel()
     private weak var oDangNhap: UITextField?
 
@@ -93,13 +95,13 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         noiDung.axis = .vertical
         noiDung.spacing = 14
         noiDung.translatesAutoresizingMaskIntoConstraints = false
-
         [
             taoHangGio(),
             taoHang("Nghỉ làm", nghi),
             taoHang("Phút chuẩn", phutChuan),
             tieuDeCot,
             danhSach,
+            tongKetQuaCongDoan,
             nutThem,
             nutTon,
             ketQua
@@ -165,10 +167,8 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         let ketQuaDong = taoNhanCot("Kết quả")
         let choXoa = UIView()
         choXoa.widthAnchor.constraint(equalToConstant: 42).isActive = true
-
         let hang = UIStackView(arrangedSubviews: [soTo, heSo, ketQuaDong, choXoa])
         hang.spacing = 6
-
         soTo.widthAnchor.constraint(equalTo: heSo.widthAnchor).isActive = true
         heSo.widthAnchor.constraint(equalTo: ketQuaDong.widthAnchor).isActive = true
         return hang
@@ -187,13 +187,11 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
     private func taoHangGio() -> UIStackView {
         let nhomVao = UIStackView(arrangedSubviews: [taoNhanGio("Giờ vào"), batDau])
         let nhomVe = UIStackView(arrangedSubviews: [taoNhanGio("Giờ về"), ketThuc])
-
         [nhomVao, nhomVe].forEach {
             $0.axis = .vertical
             $0.alignment = .center
             $0.spacing = 6
         }
-
         let hang = UIStackView(arrangedSubviews: [nhomVao, nhomVe])
         hang.axis = .horizontal
         hang.distribution = .fillEqually
@@ -225,24 +223,16 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         let soLuong = UITextField()
         let heSo = UITextField()
         let ketQuaDong = UILabel()
-
-        cauHinhONhap(soLuong, goiY: "Số tờ")
+        cauHinhONhap(soLuong, goiY: "Số lượng tờ")
         cauHinhONhap(heSo, goiY: "Hệ số %")
         soLuong.text = congDoan.soLuong == 0 ? "" : congDoan.soLuong.chuoiGon
         heSo.text = congDoan.heSo == 0 ? "" : congDoan.heSo.chuoiGon
 
-        ketQuaDong.font = .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
-        ketQuaDong.textAlignment = .center
-        ketQuaDong.textColor = .systemBlue
-        ketQuaDong.adjustsFontSizeToFitWidth = true
-        ketQuaDong.minimumScaleFactor = 0.7
-        ketQuaDong.text = (congDoan.soLuong * congDoan.heSo).chuoiGon
-
         let nutXoa = UIButton(type: .system)
         nutXoa.setImage(UIImage(systemName: "minus.circle.fill"), for: .normal)
         nutXoa.tintColor = .systemRed
-        nutXoa.widthAnchor.constraint(equalToConstant: 42).isActive = true
 
+        nutXoa.widthAnchor.constraint(equalToConstant: 42).isActive = true
         let hang = UIStackView(arrangedSubviews: [soLuong, heSo, ketQuaDong, nutXoa])
         hang.spacing = 6
         soLuong.widthAnchor.constraint(equalTo: heSo.widthAnchor).isActive = true
@@ -293,19 +283,18 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
     }
 
     private func capNhatKetQua() {
+        var tongKetQua = 0.0
         for view in danhSach.arrangedSubviews {
             guard let hang = view as? UIStackView,
                   hang.arrangedSubviews.count >= 3,
                   let soLuong = hang.arrangedSubviews[0] as? UITextField,
                   let heSo = hang.arrangedSubviews[1] as? UITextField,
-                  let ketQuaDong = hang.arrangedSubviews[2] as? UILabel else {
-                continue
-            }
-
+                  let ketQuaDong = hang.arrangedSubviews[2] as? UILabel else { continue }
             let giaTri = docSo(soLuong.text) * docSo(heSo.text)
             ketQuaDong.text = giaTri.chuoiGon
+            tongKetQua += giaTri
         }
-
+        tongKetQuaCongDoan.text = "  Tổng kết quả: \(tongKetQua.chuoiGon)  "
         ketQua.text = String(format: "%.2f%%", tinhPhanTram())
     }
 
@@ -368,12 +357,10 @@ final class ManHinhNgay: UIViewController, UITextFieldDelegate {
         duLieu.gioKetThuc = ketThuc.date
         duLieu.nghiLam = nghi.isOn
         duLieu.phutChuan = max(0, docSo(phutChuan.text))
-
         let congDoanMoi = docCongDoan()
         duLieu.congDoan = congDoanMoi
         duLieu.phanTram = tinhPhanTram()
         duLieu.daTinh = congDoanMoi.contains { $0.soLuong != 0 || $0.heSo != 0 }
-
         KhoDuLieu.dungChung.luu(duLieu)
         dismiss(animated: true, completion: khiDong)
     }
