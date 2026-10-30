@@ -534,18 +534,18 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         return CGSize(width: rong, height: 76)
     }
 
-    // MARK: - Xuất Ảnh Báo Cáo Lưới 3 Cột (Giống hệt ảnh mẫu 1 + 2)
+    // MARK: - Xuất Ảnh Báo Cáo theo số cột trong Cài đặt
 
     func taoAnhBaoCao(ngay: Date, doanhThu: ThongTinDoanhThu) -> UIImage? {
         let ds = danhSachHienThi
         guard !ds.isEmpty || doanhThu.coDuLieu else { return nil }
 
-        let soCot = 3
+        let soCot = max(1, min(4, KhoDuLieu.dungChung.caiDat.soCotXuatAnh))
         let le: CGFloat = 16
         let khoangCachO: CGFloat = 12
         let rongO: CGFloat = 320
         let caoO: CGFloat = 86
-        let rongAnh = le * 2 + CGFloat(soCot) * rongO + CGFloat(soCot - 1) * khoangCachO
+        let rongAnh = max(520, le * 2 + CGFloat(soCot) * rongO + CGFloat(soCot - 1) * khoangCachO)
 
         let soHang = Int(ceil(Double(ds.count) / Double(soCot)))
         let caoPhanDoanhThu: CGFloat = doanhThu.coDuLieu ? 116 : 0

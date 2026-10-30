@@ -108,7 +108,7 @@ final class DichVuDocAnh {
         return phanTu
     }
 
-    // MARK: - Phân tích bố cục ảnh Thi Đua ĐMX
+    // MARK: - Phân tích bố cục ảnh Thi Đua ĐMX (Giữ nguyên tên gốc, chỉ lọc theo Cài đặt)
 
     private func phanTichBangThiDua(phanTu: [PhanTuVanBan]) -> ([DongThiDua], String?, String?) {
         var capNhatLuc: String?
@@ -149,26 +149,33 @@ final class DichVuDocAnh {
         for (chiSo, moc) in mocChiTieu.enumerated() {
             let yTieuDe = moc.y
             let yGioiHanDuoi: CGFloat = (chiSo + 1 < mocChiTieu.count) ? mocChiTieu[chiSo + 1].y - 0.012 : 0.98
-            let yGioiHanTren: CGFloat = (chiSo > 0) ? (mocChiTieu[chiSo - 1].y + yTieuDe) / 2.0 : max(0.08, yTieuDe - 0.06)
 
             let loai: LoaiChiTieuThiDua = moc.chu.uppercased().contains("DOANH") ? .doanhThu : .soLuong
 
-            // 1. Lấy tên ngành hàng ở góc trái (x < 0.31) ngang hàng với tiêu đề khối
+            // Tìm vị trí dòng "TỔNG" ngay bên dưới tiêu đề khối này để làm mốc chặn dưới cho ô Tên ngành hàng
+            let mocTong = phanTu.first { pt in
+                let u = pt.chu.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                return (u == "TỔNG" || u == "TONG") && pt.x < 0.25 && pt.y > yTieuDe && pt.y < yTieuDe + 0.065
+            }
+            let yChanDuoiTen = (mocTong?.y ?? (yTieuDe + 0.032)) - 0.006
+
+            // Lấy các dòng chữ nằm đúng trong ô tiêu đề bên trái của khối (không lấy tràn lên khối trên)
             let phanTuTen = phanTu.filter { pt in
-                pt.x < 0.31
-                    && pt.y >= max(yGioiHanTren, yTieuDe - 0.045)
-                    && pt.y <= yTieuDe + 0.038
-                    && !laChuoiRac(pt.chu, watermark: maNhanVienWatermark)
+                pt.x < 0.30
+                    && pt.y >= yTieuDe - 0.028
+                    && pt.y <= yChanDuoiTen
+                    && !laNhanHeThong(pt.chu, watermark: maNhanVienWatermark)
             }.sorted { $0.y < $1.y }
 
             let tenGop = phanTuTen
                 .map { $0.chu }
                 .joined(separator: " ")
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
 
-            let tenSach = KhoDuLieu.lamSachTenNganhHang(tenGop)
-            guard !tenSach.isEmpty else { continue }
+            guard !tenGop.isEmpty else { continue }
 
-            // 2. Tìm dòng số liệu bên dưới tiêu đề khối
+            // Tìm dòng số liệu bên dưới tiêu đề khối
             let vungDuLieu = phanTu.filter { pt in
                 pt.y > yTieuDe + 0.012 && pt.y < min(yGioiHanDuoi, yTieuDe + 0.14) && pt.x >= 0.28
             }
@@ -181,7 +188,8 @@ final class DichVuDocAnh {
             guard let thucHien = soThucHien, let target = soTarget else { continue }
 
             let dong = DongThiDua(
-                tenNganhHang: tenSach,
+                tenNganhHangGoc: tenGop,
+                tenNganhHang: tenGop,
                 loaiChiTieu: loai,
                 thucHien: thucHien,
                 target: target,
@@ -199,8 +207,6 @@ final class DichVuDocAnh {
     private func phanTichDoanhThu(phanTu: [PhanTuVanBan]) -> ThongTinDoanhThu {
         var kq = ThongTinDoanhThu()
 
-        // Chia màn hình làm 2 nửa (nếu là 2 thẻ nằm ngang như ảnh mẫu: Trái = DT Thực, Phải = DT QĐ)
-        // hoặc tìm theo từ khóa "THỰC" và "QĐ" / "QUY ĐỔI"
         let mocDTThuc = phanTu.first {
             let u = $0.chu.uppercased()
             return u.contains("DOANH THU THỰC") || u.contains("DT THỰC") || u.contains("THỰC")
@@ -210,7 +216,6 @@ final class DichVuDocAnh {
             return u.contains("DOANH THU QĐ") || u.contains("QUY ĐỔI") || u.contains("DT QĐ")
         }
 
-        // Thu thập tất cả các số trong ảnh kèm tọa độ
         struct SoToaDo {
             let giaTri: Double
             let x: CGFloat
@@ -224,7 +229,6 @@ final class DichVuDocAnh {
             if inHoa.contains("%") { continue }
             let laTarget = inHoa.contains("TARGET") || inHoa.contains("MỤC TIÊU")
 
-            // Tách các số trong chuỗi (ví dụ "TARGET: 14.466,40" hoặc "8.541,00")
             let mauSo = "\\d+[\\d.,]*"
             if let regex = try? NSRegularExpression(pattern: mauSo) {
                 let ns = pt.chu as NSString
@@ -239,7 +243,6 @@ final class DichVuDocAnh {
         }
 
         if let thuc = mocDTThuc, let qd = mocDTQD, abs(thuc.x - qd.x) > 0.2 {
-            // Bố cục 2 cột Trái (DT Thực) & Phải (DT QĐ) như ảnh mẫu
             let ranhGioiX = (thuc.x + qd.x) / 2.0
             let soBenTrai = danhSachSo.filter { $0.x < ranhGioiX && $0.y > thuc.y }.sorted { $0.y < $1.y }
             let soBenPhai = danhSachSo.filter { $0.x >= ranhGioiX && $0.y > qd.y }.sorted { $0.y < $1.y }
@@ -258,7 +261,6 @@ final class DichVuDocAnh {
                 kq.targetQuyDoi = targetPhai.giaTri
             }
         } else {
-            // Bố cục chung: lấy các số lớn nhất theo thứ tự từ trên xuống hoặc trái qua phải
             let sapXep = danhSachSo.sorted {
                 if abs($0.y - $1.y) < 0.03 { return $0.x < $1.x }
                 return $0.y < $1.y
@@ -285,15 +287,12 @@ final class DichVuDocAnh {
         return kq
     }
 
-    private func laChuoiRac(_ chu: String, watermark: String?) -> Bool {
+    private func laNhanHeThong(_ chu: String, watermark: String?) -> Bool {
         let inHoa = chu.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         if inHoa == "TỔNG" || inHoa == "TONG" || inHoa == "TARGET" || inHoa.contains("% HT") || inHoa.contains("DỰ BÁO") {
             return true
         }
-        if inHoa.hasPrefix("ĐML_") || inHoa.hasPrefix("ĐMX_") || inHoa.contains("QUANG TRUNG") || inHoa.contains("CÔNG TY") {
-            return true
-        }
-        if let wm = watermark, inHoa.contains(wm) {
+        if let wm = watermark, inHoa == wm {
             return true
         }
         return false
@@ -311,7 +310,6 @@ final class DichVuDocAnh {
         return nil
     }
 
-    /// Hỗ trợ đọc cả số định dạng tiếng Anh (4,476.28) lẫn tiếng Việt (8.541,00)
     private func chuyenChuoiThanhSoLinhHoat(_ chuoi: String) -> Double? {
         var sach = chuoi
             .replacingOccurrences(of: "%", with: "")
@@ -322,21 +320,17 @@ final class DichVuDocAnh {
 
         guard !sach.isEmpty else { return nil }
 
-        // Kiểm tra xem dấu chấm hay dấu phẩy đứng sau cùng (làm dấu thập phân)
         let viTriCham = sach.lastIndex(of: ".")
         let viTriPhay = sach.lastIndex(of: ",")
 
         if let cham = viTriCham, let phay = viTriPhay {
             if phay > cham {
-                // Dạng Việt Nam: 8.541,00 -> bỏ dấu chấm, đổi phẩy thành chấm
                 sach = sach.replacingOccurrences(of: ".", with: "")
                 sach = sach.replacingOccurrences(of: ",", with: ".")
             } else {
-                // Dạng Anh: 4,476.28 -> bỏ dấu phẩy
                 sach = sach.replacingOccurrences(of: ",", with: "")
             }
         } else if viTriPhay != nil {
-            // Chỉ có dấu phẩy: nếu sau dấu phẩy có đúng 3 chữ số và trước đó <= 3 chữ số có thể là hàng nghìn, nhưng trong báo cáo ĐMX thường là thập phân (52,00) hoặc hàng nghìn (4,476)
             let phan = sach.components(separatedBy: ",")
             if phan.count == 2 && phan[1].count == 2 {
                 sach = sach.replacingOccurrences(of: ",", with: ".")
