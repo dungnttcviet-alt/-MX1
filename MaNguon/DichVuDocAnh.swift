@@ -125,11 +125,8 @@ final class DichVuDocAnh {
                     capNhatLuc = "\(capNhatLuc!) \(pt.chu)"
                 }
             }
-            if pt.chu.contains(" - "), pt.y < 0.16, pt.chu.first?.isNumber == true {
-                let tach = pt.chu.components(separatedBy: " - ")
-                if let ma = tach.first?.trimmingCharacters(in: .whitespaces), ma.count >= 4 {
-                    maNhanVienWatermark = ma
-                }
+            if pt.y < 0.16, let range = pt.chu.range(of: "\\b\\d{4,7}(?=\\s*-)", options: .regularExpression) {
+                maNhanVienWatermark = String(pt.chu[range])
             }
             if pt.chu.hasPrefix("ĐML_") || pt.chu.hasPrefix("ĐMX_") || pt.chu.hasPrefix("TGDĐ_") {
                 if thongTinDonVi == nil {
@@ -140,8 +137,12 @@ final class DichVuDocAnh {
 
         // Tìm tất cả các mốc tiêu đề khối chương trình dựa trên chữ "SỐ LƯỢNG" hoặc "DOANH THU" ở cột thứ 2 (0.22 <= x <= 0.55)
         let mocChiTieu = phanTu.filter { pt in
-            let inHoa = pt.chu.uppercased()
-            let laChiTieu = inHoa.contains("SỐ LƯỢNG") || inHoa.contains("SO LUONG") || inHoa.contains("DOANH THU")
+            let khongDau = pt.chu
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+                .replacingOccurrences(of: "đ", with: "d")
+                .replacingOccurrences(of: "Đ", with: "D")
+                .uppercased()
+            let laChiTieu = khongDau.contains("SO LUONG") || khongDau.contains("DOANH THU")
             return laChiTieu && pt.x >= 0.22 && pt.x <= 0.55 && pt.y > 0.12
         }.sorted { $0.y < $1.y }
 
@@ -214,15 +215,15 @@ final class DichVuDocAnh {
         let sapXep = danhSach.sorted { $0.y < $1.y }
         for pt in sapXep {
             let chu = pt.chu.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let wm = watermark, chu == wm { continue }
-            if let so = chuyenChuoiThanhSo(chu) {
+            if let wm = watermark, chu.contains(wm) { continue }
+            if let so = chuyenChuoiThanhSo(chu, watermark: watermark) {
                 return so
             }
         }
         return nil
     }
 
-    private func chuyenChuoiThanhSo(_ chuoi: String) -> Double? {
+    private func chuyenChuoiThanhSo(_ chuoi: String, watermark: String? = nil) -> Double? {
         // Loại bỏ ký tự %, dấu ... ở cuối (ví dụ "26.5...", "4,476.28", "74%")
         var sach = chuoi
             .replacingOccurrences(of: "%", with: "")
@@ -235,9 +236,16 @@ final class DichVuDocAnh {
         sach = sach.replacingOccurrences(of: ",", with: "")
 
         guard !sach.isEmpty else { return nil }
-        // Chỉ nhận chuỗi thực sự là số hợp lệ
+        // Nếu cả chuỗi là số hợp lệ
         if sach.range(of: "^-?\\d+(\\.\\d+)?$", options: .regularExpression) != nil {
+            if let wm = watermark, sach == wm { return nil }
             return Double(sach)
+        }
+        // Trường hợp chữ in chìm (ví dụ "Nguyễn Thanh 39") dính liền phía trước con số thực hiện
+        if let range = sach.range(of: "-?\\d+(\\.\\d+)?$", options: .regularExpression) {
+            let token = String(sach[range])
+            if let wm = watermark, token == wm { return nil }
+            return Double(token)
         }
         return nil
     }
