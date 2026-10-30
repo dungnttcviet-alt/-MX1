@@ -11,8 +11,10 @@ permissions:
 
 jobs:
   tao-ipa-va-release:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
       - name: Tai ma nguon
@@ -121,6 +123,7 @@ jobs:
           retention-days: 30
 
       - name: Tao Release va tai IPA len
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
