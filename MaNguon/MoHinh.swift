@@ -1,44 +1,25 @@
 import UIKit
 
-enum LoaiTabChinh: Int, CaseIterable {
-    case doanhThuThuc = 0
-    case doanhThuLuyKe = 1
-    case thiDua = 2
+enum LoaiChiTieuThiDua: String, Codable, CaseIterable {
+    case soLuong = "SLLK"
+    case doanhThu = "DTLK"
 
-    var tieuDeNgan: String {
+    var maNgan: String {
         switch self {
-        case .doanhThuThuc: return "DT Thực QĐ"
-        case .doanhThuLuyKe: return "DT Lũy kế QĐ"
-        case .thiDua: return "Thi đua"
-        }
-    }
-
-    var tieuDeDayDu: String {
-        switch self {
-        case .doanhThuThuc: return "Doanh thu thực quy đổi"
-        case .doanhThuLuyKe: return "Doanh thu lũy kế quy đổi"
-        case .thiDua: return "Bảng tổng hợp Thi đua"
-        }
-    }
-
-    var bieuTuong: String {
-        switch self {
-        case .doanhThuThuc: return "banknote.fill"
-        case .doanhThuLuyKe: return "chart.line.uptrend.xyaxis"
-        case .thiDua: return "trophy.fill"
+        case .soLuong: return "SLLK"
+        case .doanhThu: return "DTLK"
         }
     }
 }
 
-enum LoaiChiTieuThiDua: String, Codable, CaseIterable {
-    case soLuong = "SL"
-    case doanhThu = "DT"
+struct ThongTinDoanhThu: Codable, Hashable {
+    var doanhThuThuc: Double = 0
+    var targetThuc: Double = 0
+    var doanhThuQuyDoi: Double = 0
+    var targetQuyDoi: Double = 0
 
-    var nhanDayDu: String {
-        switch self {
-        case .soLuong: return "Số lượng"
-        case .doanhThu: return "Doanh thu"
-        }
+    var coDuLieu: Bool {
+        doanhThuThuc > 0 || targetThuc > 0 || doanhThuQuyDoi > 0 || targetQuyDoi > 0
     }
 }
 
@@ -51,8 +32,13 @@ struct DongThiDua: Codable, Hashable, Identifiable {
     var phanTramHTGoc: Double?
     var phanTramDuBaoGoc: Double?
 
-    var chenhLech: Double {
-        thucHien - target
+    /// Số còn thiếu (nếu > 0 là còn thiếu, nếu <= 0 là đã đạt/vượt)
+    var conThieu: Double {
+        max(0, target - thucHien)
+    }
+
+    var vuotMuc: Double {
+        max(0, thucHien - target)
     }
 
     var phanTramHT: Double {
@@ -64,13 +50,6 @@ struct DongThiDua: Codable, Hashable, Identifiable {
 
     var phanTramDuBao: Double {
         if let goc = phanTramDuBaoGoc, goc > 0 {
-            if let htGoc = phanTramHTGoc, htGoc > 0.1, target > 0.0001 {
-                let htMoi = (thucHien / target) * 100.0
-                if abs(htMoi - htGoc) > 1.5 {
-                    let tyLe = goc / htGoc
-                    return htMoi * tyLe
-                }
-            }
             return goc
         }
         return phanTramHT * TienIchNgay.heSoDuBaoThang()
@@ -79,35 +58,21 @@ struct DongThiDua: Codable, Hashable, Identifiable {
     var daDat: Bool {
         phanTramHT >= 99.995
     }
-
-    var daHoanThanhDuBao: Bool {
-        phanTramDuBao >= 99.995
-    }
 }
 
 struct DuLieuNgayDMX: Codable {
     var khoaNgay: String
     var capNhatLuc: String
     var thongTinDonVi: String
+    var doanhThu: ThongTinDoanhThu
     var danhSachThiDua: [DongThiDua]
-    var tenTepAnhDTThuc: String?
-    var tenTepAnhDTLuyKe: String?
-}
-
-struct CaiDatDMX: Codable {
-    var geminiApiKey: String = ""
-    var geminiModel: String = "gemini-2.5-flash"
-    var guiKemAnhChoGemini: Bool = true
-    var gopCongDonKhiQuetThem: Bool = true
 }
 
 final class ThuMucDuLieu {
     static let dungChung = ThuMucDuLieu()
 
     let thuMuc: URL
-    let thuMucAnh: URL
     let tepNgay: URL
-    let tepCaiDat: URL
 
     private let maHoa: JSONEncoder = {
         let boMaHoa = JSONEncoder()
@@ -124,13 +89,9 @@ final class ThuMucDuLieu {
         ).first!
 
         thuMuc = documents.appendingPathComponent("DuLieuDMX", isDirectory: true)
-        thuMucAnh = thuMuc.appendingPathComponent("AnhDoanhThu", isDirectory: true)
-        tepNgay = thuMuc.appendingPathComponent("du-lieu-dmx.json")
-        tepCaiDat = thuMuc.appendingPathComponent("cai-dat-dmx.json")
+        tepNgay = thuMuc.appendingPathComponent("du-lieu-dmx-v2.json")
 
         try? FileManager.default.createDirectory(at: thuMuc, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(at: thuMucAnh, withIntermediateDirectories: true)
-        taoHuongDanNeuCan()
     }
 
     func doc<T: Decodable>(_ loai: T.Type, tu tep: URL) -> T? {
@@ -145,43 +106,8 @@ final class ThuMucDuLieu {
             try duLieu.write(to: tep, options: .atomic)
             return true
         } catch {
-            print("Không thể ghi dữ liệu: \(error.localizedDescription)")
             return false
         }
-    }
-
-    func luuAnh(_ anh: UIImage, tenTep: String) -> Bool {
-        let duongDan = thuMucAnh.appendingPathComponent(tenTep)
-        guard let duLieu = anh.jpegData(compressionQuality: 0.9) else { return false }
-        do {
-            try duLieu.write(to: duongDan, options: .atomic)
-            return true
-        } catch {
-            return false
-        }
-    }
-
-    func taiAnh(tenTep: String?) -> UIImage? {
-        guard let tenTep = tenTep, !tenTep.isEmpty else { return nil }
-        let duongDan = thuMucAnh.appendingPathComponent(tenTep)
-        guard let duLieu = try? Data(contentsOf: duongDan) else { return nil }
-        return UIImage(data: duLieu)
-    }
-
-    func xoaAnh(tenTep: String?) {
-        guard let tenTep = tenTep, !tenTep.isEmpty else { return }
-        let duongDan = thuMucAnh.appendingPathComponent(tenTep)
-        try? FileManager.default.removeItem(at: duongDan)
-    }
-
-    private func taoHuongDanNeuCan() {
-        let tepHuongDan = thuMuc.appendingPathComponent("HUONG-DAN.txt")
-        guard !FileManager.default.fileExists(atPath: tepHuongDan.path) else { return }
-        let noiDung = """
-        DỮ LIỆU TỔNG HỢP ĐMX
-        Sao chép nguyên thư mục DuLieuDMX sang ứng dụng trên máy khác để chuyển toàn bộ lịch sử bảng tổng hợp và hình ảnh doanh thu.
-        """
-        try? noiDung.write(to: tepHuongDan, atomically: true, encoding: .utf8)
     }
 }
 
@@ -189,7 +115,6 @@ final class KhoDuLieu {
     static let dungChung = KhoDuLieu()
 
     private(set) var cacNgay: [String: DuLieuNgayDMX] = [:]
-    var caiDat = CaiDatDMX()
 
     private init() {
         doc()
@@ -202,12 +127,6 @@ final class KhoDuLieu {
         } else {
             thuMuc.ghi(cacNgay, vao: thuMuc.tepNgay)
         }
-
-        if let giaTri = thuMuc.doc(CaiDatDMX.self, tu: thuMuc.tepCaiDat) {
-            caiDat = giaTri
-        } else {
-            thuMuc.ghi(caiDat, vao: thuMuc.tepCaiDat)
-        }
     }
 
     func duLieu(cho ngay: Date) -> DuLieuNgayDMX {
@@ -219,9 +138,8 @@ final class KhoDuLieu {
             khoaNgay: khoa,
             capNhatLuc: "",
             thongTinDonVi: "",
-            danhSachThiDua: [],
-            tenTepAnhDTThuc: nil,
-            tenTepAnhDTLuyKe: nil
+            doanhThu: ThongTinDoanhThu(),
+            danhSachThiDua: []
         )
     }
 
@@ -230,28 +148,68 @@ final class KhoDuLieu {
         ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
     }
 
-    func luuCaiDat(_ moi: CaiDatDMX) {
-        caiDat = moi
-        ThuMucDuLieu.dungChung.ghi(moi, vao: ThuMucDuLieu.dungChung.tepCaiDat)
+    /// Làm sạch tên ngành hàng: Bỏ toàn bộ phần đầu thừa, chỉ tính từ mốc tháng (VD: "T10 - AUDIO", "T11 - TIVI")
+    static func lamSachTenNganhHang(_ tenGoc: String) -> String {
+        var s = tenGoc
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Loại bỏ các cụm từ thừa nếu bị lẫn vào
+        let cumTuThua = [
+            "Công Ty Cổ Phần Đầu Tư Điện Máy Xanh",
+            "Công Ty Cổ Phần",
+            "Điện Máy Xanh",
+            "TỔNG",
+            "SỐ LƯỢNG",
+            "DOANH THU",
+            "TARGET"
+        ]
+        for cum in cumTuThua {
+            s = s.replacingOccurrences(of: cum, with: "", options: .caseInsensitive)
+        }
+
+        // Loại bỏ tên siêu thị dạng ĐML_... hoặc địa chỉ nếu nằm ở đầu/cuối
+        s = s.replacingOccurrences(
+            of: "(ĐML|ĐMX|TGDĐ)_[A-Z0-9_]+(\\s*-\\s*[^T]+)?",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+
+        // Tìm mốc tháng dạng "T10 - ...", "T09 - T10 ...", "T11 - ..."
+        // Nếu có nhiều mốc tháng (như "T09 - T10 IPHONE"), lấy từ mốc tháng cuối cùng ("T10 ...")
+        let mauThang = "(?i)\\bT(0?[1-9]|1[0-2])\\b\\s*[-–]?\\s*"
+        if let regex = try? NSRegularExpression(pattern: mauThang) {
+            let nsString = s as NSString
+            let ketQua = regex.matches(in: s, range: NSRange(location: 0, length: nsString.length))
+            if let cuoi = ketQua.last {
+                let phanThang = nsString.substring(with: cuoi.range(at: 1))
+                let viTriSauThang = cuoi.range.location + cuoi.range.length
+                let phanTen = nsString.substring(from: viTriSauThang)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: " -–:").union(.whitespacesAndNewlines))
+                if !phanTen.isEmpty {
+                    let thangChuan = Int(phanThang).map { String(format: "T%02d", $0) } ?? "T\(phanThang)"
+                    return "\(thangChuan) - \(phanTen)"
+                }
+            }
+        }
+
+        return s.trimmingCharacters(in: CharacterSet(charactersIn: " -–:").union(.whitespacesAndNewlines))
     }
 
-    /// Gộp danh sách thi đua mới quét vào danh sách hiện có, tự động khử trùng lặp tên ngành hàng
+    /// Gộp danh sách thi đua mới quét vào danh sách hiện có, tự động khử trùng lặp
     static func gopDanhSachThiDua(cu: [DongThiDua], moi: [DongThiDua]) -> [DongThiDua] {
         var ketQua = cu
-        for dongMoi in moi {
-            let khoaMoi = chuanHoaTenNganhHang(dongMoi.tenNganhHang)
+        for var dongMoi in moi {
+            dongMoi.tenNganhHang = lamSachTenNganhHang(dongMoi.tenNganhHang)
+            let khoaMoi = chuanHoaKhoaSoSanh(dongMoi.tenNganhHang)
             guard !khoaMoi.isEmpty else { continue }
 
-            if let viTri = ketQua.firstIndex(where: { chuanHoaTenNganhHang($0.tenNganhHang) == khoaMoi }) {
+            if let viTri = ketQua.firstIndex(where: { chuanHoaKhoaSoSanh($0.tenNganhHang) == khoaMoi }) {
                 let dongCu = ketQua[viTri]
-                // Ưu tiên bản ghi có đầy đủ số liệu hơn (ví dụ ảnh trước bị cắt mất dòng số liệu ở đáy màn hình)
                 if dongMoi.target > 0 || dongMoi.thucHien > 0 || (dongCu.target == 0 && dongCu.thucHien == 0) {
-                    var capNhat = dongMoi
-                    capNhat.id = dongCu.id
-                    if dongMoi.tenNganhHang.count < dongCu.tenNganhHang.count {
-                        capNhat.tenNganhHang = dongCu.tenNganhHang
-                    }
-                    ketQua[viTri] = capNhat
+                    dongMoi.id = dongCu.id
+                    ketQua[viTri] = dongMoi
                 }
             } else {
                 ketQua.append(dongMoi)
@@ -260,10 +218,10 @@ final class KhoDuLieu {
         return ketQua
     }
 
-    static func chuanHoaTenNganhHang(_ ten: String) -> String {
-        ten.trimmingCharacters(in: .whitespacesAndNewlines)
+    static func chuanHoaKhoaSoSanh(_ ten: String) -> String {
+        lamSachTenNganhHang(ten)
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "[^A-Z0-9]", with: "", options: .regularExpression)
             .uppercased()
     }
 }
@@ -308,30 +266,22 @@ enum TienIchNgay {
 }
 
 extension Double {
-    var chuoiSoLieu: String {
-        let dinhDang = NumberFormatter()
-        dinhDang.locale = Locale(identifier: "en_US")
-        dinhDang.numberStyle = .decimal
-        if abs(self.rounded() - self) < 0.005 {
-            dinhDang.maximumFractionDigits = 0
-            dinhDang.minimumFractionDigits = 0
-        } else {
-            dinhDang.maximumFractionDigits = 2
-            dinhDang.minimumFractionDigits = 2
-        }
-        return dinhDang.string(from: NSNumber(value: self)) ?? String(format: "%.2f", self)
+    private static let boDinhDangVN: NumberFormatter = {
+        let df = NumberFormatter()
+        df.locale = Locale(identifier: "vi_VN")
+        df.numberStyle = .decimal
+        df.minimumFractionDigits = 2
+        df.maximumFractionDigits = 2
+        return df
+    }()
+
+    /// Định dạng chuẩn Việt Nam giống ảnh mẫu: 8.541,00 | 787,43 | 1.055,10
+    var chuoiSoVN: String {
+        Double.boDinhDangVN.string(from: NSNumber(value: self)) ?? String(format: "%.2f", self)
     }
 
-    var chuoiChenhLech: String {
-        if abs(self) < 0.005 { return "0" }
-        let dau = self > 0 ? "+" : ""
-        return "\(dau)\(self.chuoiSoLieu)"
-    }
-
-    var chuoiPhanTram: String {
-        if abs(self.rounded() - self) < 0.05 {
-            return String(format: "%.0f%%", self)
-        }
-        return String(format: "%.1f%%", self)
+    /// Định dạng phần trăm chuẩn giống ảnh mẫu: 98,10% | 77,60%
+    var chuoiPhanTramVN: String {
+        "\(self.chuoiSoVN)%"
     }
 }
