@@ -1,49 +1,112 @@
-import Foundation
+import UIKit
 
-struct CongDoan: Codable, Hashable {
-    var ma = UUID()
-    var soLuong: Double = 0
-    var heSo: Double = 0
-}
+enum LoaiTabChinh: Int, CaseIterable {
+    case doanhThuThuc = 0
+    case doanhThuLuyKe = 1
+    case thiDua = 2
 
-struct DuLieuNgay: Codable {
-    var khoaNgay: String
-    var gioBatDau: Date
-    var gioKetThuc: Date
-    var nghiPhut: Int
-    var nghiLam: Bool
-    var phutChuan: Double
-    var congDoan: [CongDoan]
-    var phanTram: Double
-    var daTinh: Bool
+    var tieuDeNgan: String {
+        switch self {
+        case .doanhThuThuc: return "DT Thực QĐ"
+        case .doanhThuLuyKe: return "DT Lũy kế QĐ"
+        case .thiDua: return "Thi đua"
+        }
+    }
 
-    var phutLam: Int {
-        if nghiLam { return 0 }
-        return max(0, Int(gioKetThuc.timeIntervalSince(gioBatDau) / 60) - nghiPhut)
+    var tieuDeDayDu: String {
+        switch self {
+        case .doanhThuThuc: return "Doanh thu thực quy đổi"
+        case .doanhThuLuyKe: return "Doanh thu lũy kế quy đổi"
+        case .thiDua: return "Bảng tổng hợp Thi đua"
+        }
+    }
+
+    var bieuTuong: String {
+        switch self {
+        case .doanhThuThuc: return "banknote.fill"
+        case .doanhThuLuyKe: return "chart.line.uptrend.xyaxis"
+        case .thiDua: return "trophy.fill"
+        }
     }
 }
 
-struct CaiDat: Codable {
-    var gioBatDau = 7
-    var phutBatDau = 30
-    var gioKetThuc = 16
-    var phutKetThuc = 30
-    var nghiPhut = 60
-    var phutChuan = 720.0
-    var mucTieuThang = 100.0
+enum LoaiChiTieuThiDua: String, Codable, CaseIterable {
+    case soLuong = "SL"
+    case doanhThu = "DT"
+
+    var nhanDayDu: String {
+        switch self {
+        case .soLuong: return "Số lượng"
+        case .doanhThu: return "Doanh thu"
+        }
+    }
 }
 
-struct CongDoanDu: Codable, Hashable {
-    var heSo: Double
-    var soLuong: Double
+struct DongThiDua: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var tenNganhHang: String
+    var loaiChiTieu: LoaiChiTieuThiDua
+    var thucHien: Double
+    var target: Double
+    var phanTramHTGoc: Double?
+    var phanTramDuBaoGoc: Double?
+
+    var chenhLech: Double {
+        thucHien - target
+    }
+
+    var phanTramHT: Double {
+        if target > 0.0001 {
+            return (thucHien / target) * 100.0
+        }
+        return phanTramHTGoc ?? 0
+    }
+
+    var phanTramDuBao: Double {
+        if let goc = phanTramDuBaoGoc, goc > 0 {
+            if let htGoc = phanTramHTGoc, htGoc > 0.1, target > 0.0001 {
+                let htMoi = (thucHien / target) * 100.0
+                if abs(htMoi - htGoc) > 1.5 {
+                    let tyLe = goc / htGoc
+                    return htMoi * tyLe
+                }
+            }
+            return goc
+        }
+        return phanTramHT * TienIchNgay.heSoDuBaoThang()
+    }
+
+    var daDat: Bool {
+        phanTramHT >= 99.995
+    }
+
+    var daHoanThanhDuBao: Bool {
+        phanTramDuBao >= 99.995
+    }
+}
+
+struct DuLieuNgayDMX: Codable {
+    var khoaNgay: String
+    var capNhatLuc: String
+    var thongTinDonVi: String
+    var danhSachThiDua: [DongThiDua]
+    var tenTepAnhDTThuc: String?
+    var tenTepAnhDTLuyKe: String?
+}
+
+struct CaiDatDMX: Codable {
+    var geminiApiKey: String = ""
+    var geminiModel: String = "gemini-2.5-flash"
+    var guiKemAnhChoGemini: Bool = true
+    var gopCongDonKhiQuetThem: Bool = true
 }
 
 final class ThuMucDuLieu {
     static let dungChung = ThuMucDuLieu()
 
     let thuMuc: URL
+    let thuMucAnh: URL
     let tepNgay: URL
-    let tepCongDoanDu: URL
     let tepCaiDat: URL
 
     private let maHoa: JSONEncoder = {
@@ -60,18 +123,13 @@ final class ThuMucDuLieu {
             in: .userDomainMask
         ).first!
 
-        thuMuc = documents.appendingPathComponent(
-            "DuLieuTinhCong",
-            isDirectory: true
-        )
-        tepNgay = thuMuc.appendingPathComponent("du-lieu-ngay.json")
-        tepCongDoanDu = thuMuc.appendingPathComponent("cong-doan-du.json")
-        tepCaiDat = thuMuc.appendingPathComponent("cai-dat.json")
+        thuMuc = documents.appendingPathComponent("DuLieuDMX", isDirectory: true)
+        thuMucAnh = thuMuc.appendingPathComponent("AnhDoanhThu", isDirectory: true)
+        tepNgay = thuMuc.appendingPathComponent("du-lieu-dmx.json")
+        tepCaiDat = thuMuc.appendingPathComponent("cai-dat-dmx.json")
 
-        try? FileManager.default.createDirectory(
-            at: thuMuc,
-            withIntermediateDirectories: true
-        )
+        try? FileManager.default.createDirectory(at: thuMuc, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: thuMucAnh, withIntermediateDirectories: true)
         taoHuongDanNeuCan()
     }
 
@@ -92,115 +150,121 @@ final class ThuMucDuLieu {
         }
     }
 
+    func luuAnh(_ anh: UIImage, tenTep: String) -> Bool {
+        let duongDan = thuMucAnh.appendingPathComponent(tenTep)
+        guard let duLieu = anh.jpegData(compressionQuality: 0.9) else { return false }
+        do {
+            try duLieu.write(to: duongDan, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func taiAnh(tenTep: String?) -> UIImage? {
+        guard let tenTep = tenTep, !tenTep.isEmpty else { return nil }
+        let duongDan = thuMucAnh.appendingPathComponent(tenTep)
+        guard let duLieu = try? Data(contentsOf: duongDan) else { return nil }
+        return UIImage(data: duLieu)
+    }
+
+    func xoaAnh(tenTep: String?) {
+        guard let tenTep = tenTep, !tenTep.isEmpty else { return }
+        let duongDan = thuMucAnh.appendingPathComponent(tenTep)
+        try? FileManager.default.removeItem(at: duongDan)
+    }
+
     private func taoHuongDanNeuCan() {
         let tepHuongDan = thuMuc.appendingPathComponent("HUONG-DAN.txt")
         guard !FileManager.default.fileExists(atPath: tepHuongDan.path) else { return }
         let noiDung = """
-        DỮ LIỆU TÍNH CÔNG
-        Sao chép nguyên thư mục DuLieuTinhCong sang ứng dụng trên máy khác để chuyển dữ liệu.
-        Các tệp JSON được ứng dụng tự động đọc và cập nhật.
-
-        TIMEKEEPING DATA
-        Copy the entire DuLieuTinhCong folder to the app on another device to transfer data.
-        The JSON files are read and updated automatically by the app.
+        DỮ LIỆU TỔNG HỢP ĐMX
+        Sao chép nguyên thư mục DuLieuDMX sang ứng dụng trên máy khác để chuyển toàn bộ lịch sử bảng tổng hợp và hình ảnh doanh thu.
         """
         try? noiDung.write(to: tepHuongDan, atomically: true, encoding: .utf8)
     }
 }
 
-final class KhoCongDoanDu {
-    static let dungChung = KhoCongDoanDu()
-    private let khoaCu = "cong-doan-du-v3-doc-lap"
-    private(set) var danhSach: [CongDoanDu] = []
-
-    private init() {
-        let tep = ThuMucDuLieu.dungChung.tepCongDoanDu
-        if let giaTri = ThuMucDuLieu.dungChung.doc([CongDoanDu].self, tu: tep) {
-            danhSach = giaTri.sorted { $0.heSo < $1.heSo }
-        } else if let duLieuCu = UserDefaults.standard.data(forKey: khoaCu),
-                  let giaTriCu = try? JSONDecoder().decode([CongDoanDu].self, from: duLieuCu) {
-            danhSach = giaTriCu.sorted { $0.heSo < $1.heSo }
-            ThuMucDuLieu.dungChung.ghi(danhSach, vao: tep)
-        } else {
-            ThuMucDuLieu.dungChung.ghi(danhSach, vao: tep)
-        }
-    }
-
-    func thuCongDon(_ ds: [CongDoan]) -> String? {
-        var bang = Dictionary(
-            uniqueKeysWithValues: danhSach.map { ($0.heSo, $0.soLuong) }
-        )
-
-        for dong in ds where dong.heSo > 0 && dong.soLuong != 0 {
-            let cu = bang[dong.heSo, default: 0]
-            let moi = cu + dong.soLuong
-            if moi < -0.000001 {
-                return "Loại \(dong.heSo.chuoiGon)% chỉ còn \(cu.chuoiGon) tờ, không thể trừ \((-dong.soLuong).chuoiGon) tờ."
-            }
-            bang[dong.heSo] = max(0, moi)
-        }
-
-        danhSach = bang
-            .filter { $0.value > 0.000001 }
-            .map { CongDoanDu(heSo: $0.key, soLuong: $0.value) }
-            .sorted { $0.heSo < $1.heSo }
-
-        ThuMucDuLieu.dungChung.ghi(
-            danhSach,
-            vao: ThuMucDuLieu.dungChung.tepCongDoanDu
-        )
-        return nil
-    }
-}
-
 final class KhoDuLieu {
     static let dungChung = KhoDuLieu()
-    private let khoaNgayCu = "du-lieu-ngay-v1"
-    private let khoaCaiDatCu = "cai-dat-v1"
-    private(set) var cacNgay: [String: DuLieuNgay] = [:]
-    var caiDat = CaiDat()
 
-    private init() { doc() }
+    private(set) var cacNgay: [String: DuLieuNgayDMX] = [:]
+    var caiDat = CaiDatDMX()
+
+    private init() {
+        doc()
+    }
 
     func doc() {
         let thuMuc = ThuMucDuLieu.dungChung
-        let macDinh = UserDefaults.standard
-
-        if let giaTri = thuMuc.doc([String: DuLieuNgay].self, tu: thuMuc.tepNgay) {
+        if let giaTri = thuMuc.doc([String: DuLieuNgayDMX].self, tu: thuMuc.tepNgay) {
             cacNgay = giaTri
-        } else if let duLieuCu = macDinh.data(forKey: khoaNgayCu),
-                  let giaTriCu = try? JSONDecoder().decode([String: DuLieuNgay].self, from: duLieuCu) {
-            cacNgay = giaTriCu
-            thuMuc.ghi(cacNgay, vao: thuMuc.tepNgay)
         } else {
             thuMuc.ghi(cacNgay, vao: thuMuc.tepNgay)
         }
 
-        if let giaTri = thuMuc.doc(CaiDat.self, tu: thuMuc.tepCaiDat) {
+        if let giaTri = thuMuc.doc(CaiDatDMX.self, tu: thuMuc.tepCaiDat) {
             caiDat = giaTri
-        } else if let duLieuCu = macDinh.data(forKey: khoaCaiDatCu),
-                  let giaTriCu = try? JSONDecoder().decode(CaiDat.self, from: duLieuCu) {
-            caiDat = giaTriCu
-            thuMuc.ghi(caiDat, vao: thuMuc.tepCaiDat)
         } else {
             thuMuc.ghi(caiDat, vao: thuMuc.tepCaiDat)
         }
     }
 
-    func luu(_ ngay: DuLieuNgay) {
-        cacNgay[ngay.khoaNgay] = ngay
-        ThuMucDuLieu.dungChung.ghi(
-            cacNgay,
-            vao: ThuMucDuLieu.dungChung.tepNgay
+    func duLieu(cho ngay: Date) -> DuLieuNgayDMX {
+        let khoa = TienIchNgay.khoa.string(from: ngay)
+        if let coSan = cacNgay[khoa] {
+            return coSan
+        }
+        return DuLieuNgayDMX(
+            khoaNgay: khoa,
+            capNhatLuc: "",
+            thongTinDonVi: "",
+            danhSachThiDua: [],
+            tenTepAnhDTThuc: nil,
+            tenTepAnhDTLuyKe: nil
         )
     }
 
-    func luuCaiDat(_ moi: CaiDat) {
+    func luu(_ duLieu: DuLieuNgayDMX) {
+        cacNgay[duLieu.khoaNgay] = duLieu
+        ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
+    }
+
+    func luuCaiDat(_ moi: CaiDatDMX) {
         caiDat = moi
-        ThuMucDuLieu.dungChung.ghi(
-            moi,
-            vao: ThuMucDuLieu.dungChung.tepCaiDat
-        )
+        ThuMucDuLieu.dungChung.ghi(moi, vao: ThuMucDuLieu.dungChung.tepCaiDat)
+    }
+
+    /// Gộp danh sách thi đua mới quét vào danh sách hiện có, tự động khử trùng lặp tên ngành hàng
+    static func gopDanhSachThiDua(cu: [DongThiDua], moi: [DongThiDua]) -> [DongThiDua] {
+        var ketQua = cu
+        for dongMoi in moi {
+            let khoaMoi = chuanHoaTenNganhHang(dongMoi.tenNganhHang)
+            guard !khoaMoi.isEmpty else { continue }
+
+            if let viTri = ketQua.firstIndex(where: { chuanHoaTenNganhHang($0.tenNganhHang) == khoaMoi }) {
+                let dongCu = ketQua[viTri]
+                // Ưu tiên bản ghi có đầy đủ số liệu hơn (ví dụ ảnh trước bị cắt mất dòng số liệu ở đáy màn hình)
+                if dongMoi.target > 0 || dongMoi.thucHien > 0 || (dongCu.target == 0 && dongCu.thucHien == 0) {
+                    var capNhat = dongMoi
+                    capNhat.id = dongCu.id
+                    if dongMoi.tenNganhHang.count < dongCu.tenNganhHang.count {
+                        capNhat.tenNganhHang = dongCu.tenNganhHang
+                    }
+                    ketQua[viTri] = capNhat
+                }
+            } else {
+                ketQua.append(dongMoi)
+            }
+        }
+        return ketQua
+    }
+
+    static func chuanHoaTenNganhHang(_ ten: String) -> String {
+        ten.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .uppercased()
     }
 }
 
@@ -220,52 +284,54 @@ enum TienIchNgay {
         return dinhDang
     }()
 
-    static func dauThang(_ ngay: Date) -> Date {
-        lich.date(from: lich.dateComponents([.year, .month], from: ngay))!
-    }
+    static let hienThiNgay: DateFormatter = {
+        let dinhDang = DateFormatter()
+        dinhDang.calendar = lich
+        dinhDang.locale = Locale(identifier: "vi_VN")
+        dinhDang.dateFormat = "dd/MM/yyyy"
+        return dinhDang
+    }()
 
-    static func soNgay(_ ngay: Date) -> Int {
-        lich.range(of: .day, in: .month, for: ngay)!.count
-    }
+    static let hienThiGioPhut: DateFormatter = {
+        let dinhDang = DateFormatter()
+        dinhDang.calendar = lich
+        dinhDang.locale = Locale(identifier: "vi_VN")
+        dinhDang.dateFormat = "HH:mm dd/MM/yyyy"
+        return dinhDang
+    }()
 
-    static func laChuNhat(_ ngay: Date) -> Bool {
-        lich.component(.weekday, from: ngay) == 1
-    }
-
-    static func chuNgayAm(_ ngay: Date) -> String {
-        var lichAm = Calendar(identifier: .chinese)
-        lichAm.locale = Locale(identifier: "vi_VN")
-        lichAm.timeZone = .current
-        let thanhPhan = lichAm.dateComponents([.day, .month], from: ngay)
-        guard let ngayAm = thanhPhan.day, let thangAm = thanhPhan.month else { return "" }
-        return ngayAm == 1 ? "1/\(thangAm)" : "\(ngayAm)"
-    }
-
-    static func taoGio(ngay: Date, gio: Int, phut: Int) -> Date {
-        lich.date(bySettingHour: gio, minute: phut, second: 0, of: ngay)!
-    }
-
-    static func macDinh(_ ngay: Date) -> DuLieuNgay {
-        let caiDat = KhoDuLieu.dungChung.caiDat
-        return DuLieuNgay(
-            khoaNgay: khoa.string(from: ngay),
-            gioBatDau: taoGio(ngay: ngay, gio: caiDat.gioBatDau, phut: caiDat.phutBatDau),
-            gioKetThuc: taoGio(ngay: ngay, gio: caiDat.gioKetThuc, phut: caiDat.phutKetThuc),
-            nghiPhut: caiDat.nghiPhut,
-            nghiLam: laChuNhat(ngay),
-            phutChuan: caiDat.phutChuan,
-            congDoan: [CongDoan()],
-            phanTram: 0,
-            daTinh: false
-        )
+    static func heSoDuBaoThang(cho ngay: Date = Date()) -> Double {
+        let soNgayTrongThang = Double(lich.range(of: .day, in: .month, for: ngay)?.count ?? 30)
+        let ngayHienTai = Double(max(1, lich.component(.day, from: ngay)))
+        return max(1.0, soNgayTrongThang / ngayHienTai)
     }
 }
 
 extension Double {
-    var chuoiGon: String {
-        if rounded() == self { return String(format: "%.0f", self) }
-        return String(format: "%.4f", self)
-            .replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "\\.$", with: "", options: .regularExpression)
+    var chuoiSoLieu: String {
+        let dinhDang = NumberFormatter()
+        dinhDang.locale = Locale(identifier: "en_US")
+        dinhDang.numberStyle = .decimal
+        if abs(self.rounded() - self) < 0.005 {
+            dinhDang.maximumFractionDigits = 0
+            dinhDang.minimumFractionDigits = 0
+        } else {
+            dinhDang.maximumFractionDigits = 2
+            dinhDang.minimumFractionDigits = 2
+        }
+        return dinhDang.string(from: NSNumber(value: self)) ?? String(format: "%.2f", self)
+    }
+
+    var chuoiChenhLech: String {
+        if abs(self) < 0.005 { return "0" }
+        let dau = self > 0 ? "+" : ""
+        return "\(dau)\(self.chuoiSoLieu)"
+    }
+
+    var chuoiPhanTram: String {
+        if abs(self.rounded() - self) < 0.05 {
+            return String(format: "%.0f%%", self)
+        }
+        return String(format: "%.1f%%", self)
     }
 }

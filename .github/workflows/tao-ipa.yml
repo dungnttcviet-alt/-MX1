@@ -77,8 +77,8 @@ jobs:
         run: |
           set -e
           xcodebuild \
-            -project TinhCongSanLuong.xcodeproj \
-            -scheme TinhCongSanLuong \
+            -project TongHopDMX.xcodeproj \
+            -scheme TongHopDMX \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath DerivedData \
@@ -89,8 +89,8 @@ jobs:
       - name: Dong goi IPA
         run: |
           set -e
-          APP_PATH="DerivedData/Build/Products/Release-iphoneos/TinhCongSanLuong.app"
-          IPA_PATH="TinhCongSanLuong-unsigned.ipa"
+          APP_PATH="DerivedData/Build/Products/Release-iphoneos/TongHopDMX.app"
+          IPA_PATH="TongHopDMX-unsigned.ipa"
           test -d "$APP_PATH"
           rm -rf Payload "$IPA_PATH"
           mkdir -p Payload
@@ -109,8 +109,8 @@ jobs:
       - name: Luu IPA vao Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TinhCongSanLuong-unsigned
-          path: TinhCongSanLuong-unsigned.ipa
+          name: TongHopDMX-unsigned
+          path: TongHopDMX-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -118,18 +118,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Tinh Cong San Luong ${{ steps.version.outputs.tag }}
+          name: Tong Hop DMX ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           body: |
-            Bản IPA chưa ký dành cho iPhone.
-            Unsigned IPA for iPhone.
-
-            Lưu toàn bộ dữ liệu vào Documents/DuLieuTinhCong dưới dạng JSON để sao chép sang thiết bị khác.
-            Updated hour statistics, average productivity, current-day highlight, and lunar calendar.
-
+            Bản IPA chưa ký dành cho iPhone (Tổng Hợp Số Liệu ĐMX).
+            Lưu dữ liệu tại Documents/DuLieuDMX để sao chép qua ứng dụng Tệp (Files).
             Tải IPA trong Assets rồi ký bằng ESign.
-            Download the IPA from Assets and sign it with ESign.
-          files: TinhCongSanLuong-unsigned.ipa
+          files: TongHopDMX-unsigned.ipa
           fail_on_unmatched_files: true
           make_latest: true
         env:

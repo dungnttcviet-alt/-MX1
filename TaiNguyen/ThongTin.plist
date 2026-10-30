@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleDevelopmentRegion</key><string>vi</string>
-<key>CFBundleDisplayName</key><string>Tính Công</string>
+<key>CFBundleDisplayName</key><string>Tổng Hợp ĐMX</string>
 <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
 <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
@@ -13,6 +13,8 @@
 <key>LSRequiresIPhoneOS</key><true/>
 <key>UIFileSharingEnabled</key><true/>
 <key>LSSupportsOpeningDocumentsInPlace</key><true/>
+<key>NSPhotoLibraryUsageDescription</key><string>Ứng dụng cần quyền truy cập Thư viện ảnh để chọn ảnh chụp màn hình tổng hợp số liệu.</string>
+<key>NSPhotoLibraryAddUsageDescription</key><string>Ứng dụng cần quyền lưu ảnh bảng tổng hợp vào Thư viện ảnh.</string>
 <key>UILaunchScreen</key><dict/>
 <key>UIRequiresFullScreen</key><true/>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
