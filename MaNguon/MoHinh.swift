@@ -267,8 +267,9 @@ final class KhoDuLieu {
     }
 
     static func chuanHoaKhoaSoSanh(_ ten: String) -> String {
-        ten.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
-            .replacingOccurrences(of: "[^A-Z0-9]", with: "", options: .regularExpression)
+        ten.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .uppercased()
     }
 }
