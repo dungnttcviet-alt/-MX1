@@ -158,6 +158,13 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         bangThiDua.khiChonDong = { [weak self] dong in
             self?.moHopThoaiSuaDong(dong)
         }
+        bangThiDua.khiXoaDong = { [weak self] id in
+            guard let self = self else { return }
+            var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
+            dl.danhSachThiDua.removeAll { $0.id == id }
+            KhoDuLieu.dungChung.luu(dl)
+            self.napDuLieu()
+        }
 
         taoGiaoDienKhungDuPhong()
 
@@ -588,8 +595,8 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             tf.text = dong.tenNganhHang
         }
         hop.addTextField { tf in
-            tf.placeholder = "ĐVT: DTLK hoặc SLLK"
-            tf.text = dong.loaiChiTieu.maNgan
+            tf.placeholder = "ĐVT: DT hoặc SL"
+            tf.text = dong.loaiChiTieu.maBang
             tf.autocapitalizationType = .allCharacters
         }
         hop.addTextField { tf in
@@ -711,16 +718,27 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
         guard !dl.danhSachThiDua.isEmpty || dl.doanhThu.coDuLieu else { return }
 
-        let soCot = KhoDuLieu.dungChung.caiDat.soCotXuatAnh
+        let kieu = KhoDuLieu.dungChung.caiDat.kieuHienThi
+        let moTaKieu = (kieu == .bangChiTiet) ? "Mẫu Bảng 8 cột" : "Mẫu Thẻ \(KhoDuLieu.dungChung.caiDat.soCotXuatAnh) cột"
+
         let menu = UIAlertController(title: "Xuất báo cáo tổng hợp", message: nil, preferredStyle: .actionSheet)
-        menu.addAction(UIAlertAction(title: "🖼️ Xuất Ảnh báo cáo (\(soCot) cột + Doanh thu)", style: .default) { [weak self] _ in
+        menu.addAction(UIAlertAction(title: "🖼️ Xuất Ảnh báo cáo (\(moTaKieu))", style: .default) { [weak self] _ in
             guard let self = self,
-                  let anh = self.bangThiDua.taoAnhBaoCao(ngay: self.ngayHienTai, doanhThu: dl.doanhThu) else { return }
+                  let anh = self.bangThiDua.taoAnhBaoCao(
+                      ngay: self.ngayHienTai,
+                      doanhThu: dl.doanhThu,
+                      thongTinDonVi: dl.thongTinDonVi,
+                      capNhatLuc: dl.capNhatLuc
+                  ) else { return }
             self.chiaSe([anh])
         })
-        menu.addAction(UIAlertAction(title: "📋 Sao chép văn bản báo cáo", style: .default) { [weak self] _ in
+        menu.addAction(UIAlertAction(title: "📊 Xuất file Excel (.csv)", style: .default) { [weak self] _ in
             guard let self = self else { return }
-            UIPasteboard.general.string = self.bangThiDua.taoVanBanBaoCao(ngay: self.ngayHienTai, doanhThu: dl.doanhThu)
+            let csv = self.bangThiDua.taoChuoiExcelCSV(doanhThu: dl.doanhThu)
+            let tenTep = "TongHopDMX-\(dl.khoaNgay).csv"
+            let duongDan = FileManager.default.temporaryDirectory.appendingPathComponent(tenTep)
+            try? csv.write(to: duongDan, atomically: true, encoding: .utf8)
+            self.chiaSe([duongDan])
         })
         menu.addAction(UIAlertAction(title: "Đóng", style: .cancel))
         if let pop = menu.popoverPresentationController {

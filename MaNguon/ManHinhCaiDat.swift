@@ -1,6 +1,7 @@
 import UIKit
 
 final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
+    private let chonKieuHienThi = UISegmentedControl(items: ["Bảng 8 cột (Chi tiết)", "Thẻ tiến độ (Gọn)"])
     private let chonSoCotXuat = UISegmentedControl(items: ["1 cột", "2 cột", "3 cột", "4 cột"])
     private let oNhapCumTu = UITextField()
     private let bangCumTu = UITableView(frame: .zero, style: .plain)
@@ -19,6 +20,7 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
         )
 
         let cd = KhoDuLieu.dungChung.caiDat
+        chonKieuHienThi.selectedSegmentIndex = cd.kieuHienThi.rawValue
         danhSachCumTu = cd.danhSachCumTuLocBo
         let chiSoCot = max(0, min(3, cd.soCotXuatAnh - 1))
         chonSoCotXuat.selectedSegmentIndex = chiSoCot
@@ -27,23 +29,29 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
     }
 
     private func taoGiaoDien() {
-        // 1. Khối chọn số cột khi Xuất ảnh báo cáo
-        let tieuDeCot = taoTieuDeNhom("1. SỐ CỘT KHI XUẤT ẢNH BÁO CÁO")
-        let khungCot = UIView()
-        khungCot.backgroundColor = .secondarySystemGroupedBackground
-        khungCot.layer.cornerRadius = 12
+        // 1. Khối chọn kiểu hiển thị & xuất báo cáo (1 trong 2 cách như ảnh)
+        let tieuDeKieu = taoTieuDeNhom("1. KIỂU HIỂN THỊ & XUẤT BÁO CÁO")
+        let khungKieu = UIView()
+        khungKieu.backgroundColor = .secondarySystemGroupedBackground
+        khungKieu.layer.cornerRadius = 12
+
+        let nhanMoTaKieu = UILabel()
+        nhanMoTaKieu.text = "Chọn 1 trong 2 mẫu hiển thị trên màn hình và khi xuất ảnh:"
+        nhanMoTaKieu.font = .systemFont(ofSize: 13)
+        nhanMoTaKieu.textColor = .secondaryLabel
+        nhanMoTaKieu.numberOfLines = 0
 
         let nhanMoTaCot = UILabel()
-        nhanMoTaCot.text = "Chọn số cột thẻ Thi đua khi xuất ra ảnh báo cáo tổng hợp:"
+        nhanMoTaCot.text = "Số cột khi xuất ảnh (áp dụng cho mẫu Thẻ tiến độ):"
         nhanMoTaCot.font = .systemFont(ofSize: 13)
         nhanMoTaCot.textColor = .secondaryLabel
         nhanMoTaCot.numberOfLines = 0
 
-        let nganCot = UIStackView(arrangedSubviews: [nhanMoTaCot, chonSoCotXuat])
-        nganCot.axis = .vertical
-        nganCot.spacing = 10
-        nganCot.translatesAutoresizingMaskIntoConstraints = false
-        khungCot.addSubview(nganCot)
+        let nganKieu = UIStackView(arrangedSubviews: [nhanMoTaKieu, chonKieuHienThi, nhanMoTaCot, chonSoCotXuat])
+        nganKieu.axis = .vertical
+        nganKieu.spacing = 10
+        nganKieu.translatesAutoresizingMaskIntoConstraints = false
+        khungKieu.addSubview(nganKieu)
 
         // 2. Khối thêm cụm từ lọc bỏ trong tên ngành hàng
         let tieuDeLoc = taoTieuDeNhom("2. CỤM TỪ LỌC BỎ TRONG TẤT CẢ NGÀNH HÀNG")
@@ -52,7 +60,7 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
         khungLoc.layer.cornerRadius = 12
         khungLoc.clipsToBounds = true
 
-        oNhapCumTu.placeholder = "Nhập cụm từ muốn lọc bỏ (VD: T09 - , T10 - )..."
+        oNhapCumTu.placeholder = "Nhập cụm từ muốn lọc bỏ (VD: 275 Quang Trung)..."
         oNhapCumTu.borderStyle = .roundedRect
         oNhapCumTu.font = .systemFont(ofSize: 14)
         oNhapCumTu.clearButtonMode = .whileEditing
@@ -87,26 +95,26 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
             khungLoc.addSubview($0)
         }
 
-        [tieuDeCot, khungCot, tieuDeLoc, khungLoc].forEach {
+        [tieuDeKieu, khungKieu, tieuDeLoc, khungLoc].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
 
         NSLayoutConstraint.activate([
-            tieuDeCot.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 14),
-            tieuDeCot.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            tieuDeCot.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            tieuDeKieu.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+            tieuDeKieu.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            tieuDeKieu.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
-            khungCot.topAnchor.constraint(equalTo: tieuDeCot.bottomAnchor, constant: 6),
-            khungCot.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
-            khungCot.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
+            khungKieu.topAnchor.constraint(equalTo: tieuDeKieu.bottomAnchor, constant: 6),
+            khungKieu.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+            khungKieu.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
 
-            nganCot.topAnchor.constraint(equalTo: khungCot.topAnchor, constant: 12),
-            nganCot.leadingAnchor.constraint(equalTo: khungCot.leadingAnchor, constant: 12),
-            nganCot.trailingAnchor.constraint(equalTo: khungCot.trailingAnchor, constant: -12),
-            nganCot.bottomAnchor.constraint(equalTo: khungCot.bottomAnchor, constant: -12),
+            nganKieu.topAnchor.constraint(equalTo: khungKieu.topAnchor, constant: 12),
+            nganKieu.leadingAnchor.constraint(equalTo: khungKieu.leadingAnchor, constant: 12),
+            nganKieu.trailingAnchor.constraint(equalTo: khungKieu.trailingAnchor, constant: -12),
+            nganKieu.bottomAnchor.constraint(equalTo: khungKieu.bottomAnchor, constant: -12),
 
-            tieuDeLoc.topAnchor.constraint(equalTo: khungCot.bottomAnchor, constant: 18),
+            tieuDeLoc.topAnchor.constraint(equalTo: khungKieu.bottomAnchor, constant: 16),
             tieuDeLoc.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             tieuDeLoc.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
@@ -148,15 +156,16 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
     }
 
     @objc private func luuCaiDat() {
-        // Nếu người dùng vừa gõ chữ trong ô mà chưa bấm "+ Thêm", tự thêm luôn khi bấm Lưu
         if let dangGo = oNhapCumTu.text?.trimmingCharacters(in: .whitespacesAndNewlines), !dangGo.isEmpty {
             if !danhSachCumTu.contains(where: { $0.caseInsensitiveCompare(dangGo) == .orderedSame }) {
                 danhSachCumTu.insert(dangGo, at: 0)
             }
         }
 
+        let kieu = KieuHienThiBaoCao(rawValue: chonKieuHienThi.selectedSegmentIndex) ?? .bangChiTiet
         let soCot = chonSoCotXuat.selectedSegmentIndex + 1
         let moi = CaiDatDMX(
+            kieuHienThi: kieu,
             danhSachCumTuLocBo: danhSachCumTu,
             soCotXuatAnh: soCot
         )

@@ -14,25 +14,45 @@ enum LoaiTabMuc: Int, CaseIterable {
         case .duPhong3: return "Dự phòng 3"
         }
     }
+}
 
-    var bieuTuong: String {
+enum KieuHienThiBaoCao: Int, Codable, CaseIterable {
+    case bangChiTiet = 0
+    case theGon = 1
+
+    var tieuDe: String {
         switch self {
-        case .thiDua: return "trophy.fill"
-        case .duPhong1: return "square.grid.2x2"
-        case .duPhong2: return "chart.bar.fill"
-        case .duPhong3: return "star.fill"
+        case .bangChiTiet: return "Bảng 8 cột"
+        case .theGon: return "Thẻ tiến độ"
         }
     }
 }
 
 enum LoaiChiTieuThiDua: String, Codable, CaseIterable {
-    case soLuong = "SLLK"
-    case doanhThu = "DTLK"
+    case soLuong = "SL"
+    case doanhThu = "DT"
 
-    var maNgan: String {
+    var maBang: String {
+        switch self {
+        case .soLuong: return "SL"
+        case .doanhThu: return "DT"
+        }
+    }
+
+    var maThe: String {
         switch self {
         case .soLuong: return "SLLK"
         case .doanhThu: return "DTLK"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = (try? container.decode(String.self))?.uppercased() ?? "DT"
+        if raw.contains("SL") {
+            self = .soLuong
+        } else {
+            self = .doanhThu
         }
     }
 }
@@ -79,6 +99,10 @@ struct DongThiDua: Codable, Hashable, Identifiable {
         self.phanTramDuBaoGoc = phanTramDuBaoGoc
     }
 
+    var chenhLech: Double {
+        thucHien - target
+    }
+
     var conThieu: Double {
         max(0, target - thucHien)
     }
@@ -96,6 +120,13 @@ struct DongThiDua: Codable, Hashable, Identifiable {
 
     var phanTramDuBao: Double {
         if let goc = phanTramDuBaoGoc, goc > 0 {
+            if let htGoc = phanTramHTGoc, htGoc > 0.1, target > 0.0001 {
+                let htMoi = (thucHien / target) * 100.0
+                if abs(htMoi - htGoc) > 1.5 {
+                    let tyLe = goc / htGoc
+                    return htMoi * tyLe
+                }
+            }
             return goc
         }
         return phanTramHT * TienIchNgay.heSoDuBaoThang()
@@ -104,9 +135,14 @@ struct DongThiDua: Codable, Hashable, Identifiable {
     var daDat: Bool {
         phanTramHT >= 99.995
     }
+
+    var daHoanThanhDuBao: Bool {
+        phanTramDuBao >= 99.995
+    }
 }
 
 struct CaiDatDMX: Codable {
+    var kieuHienThi: KieuHienThiBaoCao = .bangChiTiet
     var danhSachCumTuLocBo: [String] = []
     var soCotXuatAnh: Int = 3
 }
@@ -215,7 +251,6 @@ final class KhoDuLieu {
     func luuCaiDat(_ moi: CaiDatDMX) {
         caiDat = moi
         ThuMucDuLieu.dungChung.ghi(moi, vao: ThuMucDuLieu.dungChung.tepCaiDat)
-        // Cập nhật lại tên hiển thị của tất cả các ngành hàng đã lưu theo danh sách cụm từ lọc bỏ mới
         for (khoa, var dl) in cacNgay {
             for i in dl.danhSachThiDua.indices {
                 let goc = dl.danhSachThiDua[i].tenNganhHangGoc
@@ -245,7 +280,6 @@ final class KhoDuLieu {
         return s.isEmpty ? tenGoc : s
     }
 
-    /// Gộp danh sách thi đua mới quét vào danh sách hiện có, tự động khử trùng lặp
     static func gopDanhSachThiDua(cu: [DongThiDua], moi: [DongThiDua]) -> [DongThiDua] {
         var ketQua = cu
         for var dongMoi in moi {
@@ -329,5 +363,32 @@ extension Double {
 
     var chuoiPhanTramVN: String {
         "\(self.chuoiSoVN)%"
+    }
+
+    var chuoiSoLieu: String {
+        let dinhDang = NumberFormatter()
+        dinhDang.locale = Locale(identifier: "en_US")
+        dinhDang.numberStyle = .decimal
+        if abs(self.rounded() - self) < 0.005 {
+            dinhDang.maximumFractionDigits = 0
+            dinhDang.minimumFractionDigits = 0
+        } else {
+            dinhDang.maximumFractionDigits = 2
+            dinhDang.minimumFractionDigits = 2
+        }
+        return dinhDang.string(from: NSNumber(value: self)) ?? String(format: "%.2f", self)
+    }
+
+    var chuoiChenhLech: String {
+        if abs(self) < 0.005 { return "0" }
+        let dau = self > 0 ? "+" : ""
+        return "\(dau)\(self.chuoiSoLieu)"
+    }
+
+    var chuoiPhanTram: String {
+        if abs(self.rounded() - self) < 0.05 {
+            return String(format: "%.0f%%", self)
+        }
+        return String(format: "%.1f%%", self)
     }
 }
