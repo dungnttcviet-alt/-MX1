@@ -11,14 +11,20 @@ permissions:
 
 jobs:
   tao-ipa-va-release:
-    runs-on: macos-14
+    runs-on: macos-15
+    timeout-minutes: 15
 
     steps:
       - name: Tai ma nguon
         uses: actions/checkout@v4
 
       - name: Cai XcodeGen
-        run: brew install xcodegen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install xcodegen
+          else
+            xcodegen --version
+          fi
 
       - name: Chuan hoa icon ung dung
         shell: bash
