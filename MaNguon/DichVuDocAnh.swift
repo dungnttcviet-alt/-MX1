@@ -319,7 +319,7 @@ final class DichVuDocAnh {
 
         // Kiểm tra xem có các dòng chương trình dạng "T10 - ..." hoặc nhãn DT / SL không
         let coDongChuongTrinh = phanTu.contains { pt in
-            pt.x < 0.55 && pt.y > 0.16 && pt.chu.range(of: "\bT\d{1,2}\s*[-–]", options: .regularExpression) != nil
+            pt.x < 0.55 && pt.y > 0.16 && pt.chu.range(of: "\\bT\\d{1,2}\\s*[-–]", options: .regularExpression) != nil
         }
 
         guard mocChuongTrinh != nil || mocTarget != nil || mocThucHien != nil || coDongChuongTrinh else {
@@ -393,19 +393,19 @@ final class DichVuDocAnh {
             var tenSach = chuoiGop
 
             if sapXepX.contains(where: { boDau($0.chu).trimmingCharacters(in: .whitespacesAndNewlines) == "SL" }) ||
-               u.range(of: "\bSL\s*$", options: .regularExpression) != nil {
+               u.range(of: "\\bSL\\s*$", options: .regularExpression) != nil {
                 loai = .soLuong
             } else if sapXepX.contains(where: { boDau($0.chu).trimmingCharacters(in: .whitespacesAndNewlines) == "DT" }) ||
-                      u.range(of: "\bDT\s*$", options: .regularExpression) != nil {
+                      u.range(of: "\\bDT\\s*$", options: .regularExpression) != nil {
                 loai = .doanhThu
             }
 
             // Loại bỏ ký hiệu dấu trừ "−" / "-" ở đầu dòng và nhãn "DT" / "SL" ở cuối tên chương trình
             tenSach = tenSach
-                .replacingOccurrences(of: "^[\s\-–—−•◦○●⊕⊖]+", with: "", options: .regularExpression)
-                .replacingOccurrences(of: "\s+\b(DT|SL)\b\s*$", with: "", options: .regularExpression)
-                .replacingOccurrences(of: "\.\.\.|…", with: "", options: .regularExpression)
-                .replacingOccurrences(of: "\s+", with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "^[\\s\\-–—−•◦○●⊕⊖]+", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\s+\\b(DT|SL)\\b\\s*$", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\.\\.\\.|…", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard tenSach.count >= 2 else { continue }
