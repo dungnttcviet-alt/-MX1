@@ -501,8 +501,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         let tenCheDo = cheDoDoanhThu.tieuDe
         let menu = UIAlertController(
             title: "Doanh thu \(tenCheDo) — Thực & Quy đổi",
-            message: "Đang xem mục: \(tenCheDo.uppercased()).
-Khi quét ảnh, vui lòng chọn cùng lúc đủ 2 ảnh chụp màn hình (1 ảnh DT thực + 1 ảnh DT quy đổi) của phần \(tenCheDo).",
+            message: "Đang xem mục: \(tenCheDo.uppercased()).\nKhi quét ảnh, vui lòng chọn cùng lúc đủ 2 ảnh chụp màn hình (1 ảnh DT thực + 1 ảnh DT quy đổi) của phần \(tenCheDo).",
             preferredStyle: .actionSheet
         )
         menu.addAction(UIAlertAction(title: "📷 Nhập 2 ảnh Doanh thu \(tenCheDo) (Thực + QĐ)", style: .default) { [weak self] _ in
@@ -516,28 +515,7 @@ Khi quét ảnh, vui lòng chọn cùng lúc đủ 2 ảnh chụp màn hình (1 
             guard let self = self else { return }
             var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
             if self.cheDoDoanhThu == .luyKe {
-                dl.doanhThuRealtime = ThongTinDoanhThu(
-            doanhThuThuc: 385.50,
-            targetThuc: 420.00,
-            duKienThuc: 410.00,
-            phanTramHTThuc: 91.8,
-            doanhThuQuyDoi: 542.80,
-            targetQuyDoi: 560.00,
-            duKienQuyDoi: 575.00,
-            phanTramHTQuyDoi: 96.9,
-            phanTramTraGop: 44.2,
-            doanhThuTraGop: 239.90,
-            luotKhach: 645,
-            soBill: 78,
-            phanTramPVTC: 12.1,
-            tangGiamCungKy: 8.4,
-            coTangGiam: true,
-            tb3Thang: 355.6,
-            soNgayDaQua: 29,
-            tongSoNgay: 31,
-            phanTramTienDoThang: 94.0
-        )
-        dl.doanhThu = ThongTinDoanhThu()
+                dl.doanhThu = ThongTinDoanhThu()
             } else {
                 dl.doanhThuRealtime = ThongTinDoanhThu()
             }
@@ -557,12 +535,7 @@ Khi quét ảnh, vui lòng chọn cùng lúc đủ 2 ảnh chụp màn hình (1 
         let tenCheDo = cheDo.tieuDe
         let hd = UIAlertController(
             title: "Hướng dẫn nhập ảnh Doanh thu (\(tenCheDo))",
-            message: "Bắt buộc chọn đủ 2 ảnh trong 1 lần:
-
-1️⃣ Ảnh 1: Chụp màn hình Doanh thu THỰC (\(tenCheDo))
-2️⃣ Ảnh 2: Chụp màn hình Doanh thu QUY ĐỔI (\(tenCheDo))
-
-Hệ thống sẽ tự động phân tích và gộp đủ Doanh thu thực, Doanh thu quy đổi cùng toàn bộ chỉ số phụ.",
+            message: "Bắt buộc chọn đủ 2 ảnh trong 1 lần:\n\n1️⃣ Ảnh 1: Chụp màn hình Doanh thu THỰC (\(tenCheDo))\n2️⃣ Ảnh 2: Chụp màn hình Doanh thu QUY ĐỔI (\(tenCheDo))\n\nHệ thống sẽ tự động phân tích và gộp đủ Doanh thu thực, Doanh thu quy đổi cùng toàn bộ chỉ số phụ.",
             preferredStyle: .alert
         )
         hd.addAction(UIAlertAction(title: "Chọn đủ 2 ảnh ngay", style: .default) { [weak self] _ in
@@ -758,9 +731,7 @@ Hệ thống sẽ tự động phân tích và gộp đủ Doanh thu thực, Doa
         guard cacAnh.count == 2 else {
             let tb = UIAlertController(
                 title: "Cần chọn đủ 2 ảnh Doanh thu (\(tenCheDo))",
-                message: "Bạn vừa chọn \(cacAnh.count) ảnh. Bắt buộc chọn đủ 2 ảnh trong 1 lần:
-• 1 ảnh chứa Doanh thu THỰC
-• 1 ảnh chứa Doanh thu QUY ĐỔI",
+                message: "Bạn vừa chọn \(cacAnh.count) ảnh. Bắt buộc chọn đủ 2 ảnh trong 1 lần:\n• 1 ảnh chứa Doanh thu THỰC\n• 1 ảnh chứa Doanh thu QUY ĐỔI",
                 preferredStyle: .alert
             )
             tb.addAction(UIAlertAction(title: "Chọn lại 2 ảnh", style: .default) { [weak self] _ in
@@ -909,6 +880,27 @@ Hệ thống sẽ tự động phân tích và gộp đủ Doanh thu thực, Doa
 
     private func napDuLieuMau() {
         var dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
+        dl.doanhThuRealtime = ThongTinDoanhThu(
+            doanhThuThuc: 385.50,
+            targetThuc: 420.00,
+            duKienThuc: 410.00,
+            phanTramHTThuc: 91.8,
+            doanhThuQuyDoi: 542.80,
+            targetQuyDoi: 560.00,
+            duKienQuyDoi: 575.00,
+            phanTramHTQuyDoi: 96.9,
+            phanTramTraGop: 44.2,
+            doanhThuTraGop: 239.90,
+            luotKhach: 645,
+            soBill: 78,
+            phanTramPVTC: 12.1,
+            tangGiamCungKy: 8.4,
+            coTangGiam: true,
+            tb3Thang: 355.6,
+            soNgayDaQua: 29,
+            tongSoNgay: 31,
+            phanTramTienDoThang: 94.0
+        )
         dl.doanhThu = ThongTinDoanhThu(
             doanhThuThuc: 10957.00,
             targetThuc: 11128.00,
