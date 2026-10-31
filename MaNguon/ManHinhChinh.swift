@@ -12,6 +12,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     private var tabHienTai: LoaiTabMuc = .thiDua
     private var cheDoDoanhThu: LoaiCheDoDoanhThu = .luyKe
     private var cheDoQuet: CheDoQuetAnh = .thiDua
+    private var thayTheBangThiDuaKhiQuet: Bool = false
 
     private let nutNgay = UIButton(type: .system)
 
@@ -421,14 +422,29 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     }
 
     private func moHuongDanQuetAnhThiDua() {
+        let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
+        let thongDiep = "Quy cách quét cặp 2 ảnh Thi đua:\n\n1️⃣ Ảnh 1 (Doanh thu thực hiện hoặc Target): Lấy từ trên xuống Tên ngành hàng, đơn vị tính (DT / SL) và cột số của Ảnh 1.\n2️⃣ Ảnh 2 (cột còn lại): Chỉ lấy cột số từ trên xuống để điền ghép vào danh sách của Ảnh 1 (không quét lại tên ngành hàng)."
+
         let hd = UIAlertController(
-            title: "Nhập ảnh Thi đua (Target & Thực hiện)",
-            message: "Hãy chọn cùng lúc các ảnh chụp màn hình bảng Thi đua:\n\n1️⃣ Ảnh chụp cột TARGET (CHƯƠNG TRÌNH | TARGET)\n2️⃣ Ảnh chụp cột ĐẠT ĐƯỢC (CHƯƠNG TRÌNH | THỰC HIỆN)\n\n(Nếu danh sách dài cần cuộn trang, bạn có thể chọn nhiều ảnh Target và nhiều ảnh Thực hiện cùng lúc — hệ thống sẽ tự động khớp từng ngành hàng).",
+            title: "Nhập 2 ảnh Thi đua (Ảnh 1 & Ảnh 2)",
+            message: thongDiep,
             preferredStyle: .alert
         )
-        hd.addAction(UIAlertAction(title: "Chọn ảnh Thi đua ngay", style: .default) { [weak self] _ in
-            self?.moChonAnh(cheDo: .thiDua, gioiHan: 0)
-        })
+        if dl.danhSachThiDua.isEmpty || dl.danhSachThiDua.allSatisfy({ $0.target <= 0 }) || dl.danhSachThiDua.allSatisfy({ $0.thucHien <= 0 }) {
+            hd.addAction(UIAlertAction(title: "📷 Chọn 2 ảnh Thi đua ngay", style: .default) { [weak self] _ in
+                self?.thayTheBangThiDuaKhiQuet = false
+                self?.moChonAnh(cheDo: .thiDua, gioiHan: 0)
+            })
+        } else {
+            hd.addAction(UIAlertAction(title: "🔄 Quét mới 2 ảnh (Thay thế bảng hiện tại)", style: .default) { [weak self] _ in
+                self?.thayTheBangThiDuaKhiQuet = true
+                self?.moChonAnh(cheDo: .thiDua, gioiHan: 0)
+            })
+            hd.addAction(UIAlertAction(title: "➕ Quét nối tiếp 2 ảnh (Cuộn trang tiếp theo)", style: .default) { [weak self] _ in
+                self?.thayTheBangThiDuaKhiQuet = false
+                self?.moChonAnh(cheDo: .thiDua, gioiHan: 0)
+            })
+        }
         hd.addAction(UIAlertAction(title: "Huỷ", style: .cancel))
         present(hd, animated: true)
     }
@@ -666,9 +682,12 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     }
 
     private func xuLyQuetThiDua(_ cacAnh: [UIImage]) {
+        let dlHienTai = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
+        let dsHienCo = thayTheBangThiDuaKhiQuet ? [] : dlHienTai.danhSachThiDua
         hienTienTrinh("Đang đọc \(cacAnh.count) ảnh Thi đua...")
         DichVuDocAnh.dungChung.quetAnhThiDua(
             danhSachAnh: cacAnh,
+            danhSachHienCo: dsHienCo,
             tienTrinh: { [weak self] tt in
                 self?.nhanTienTrinh.text = tt
             },
@@ -677,8 +696,13 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
                 self.anTienTrinh()
                 var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
                 if !kq.danhSach.isEmpty {
-                    dl.danhSachThiDua = KhoDuLieu.gopDanhSachThiDua(cu: dl.danhSachThiDua, moi: kq.danhSach)
+                    if self.thayTheBangThiDuaKhiQuet {
+                        dl.danhSachThiDua = KhoDuLieu.gopDanhSachThiDua(cu: [], moi: kq.danhSach)
+                    } else {
+                        dl.danhSachThiDua = KhoDuLieu.gopDanhSachThiDua(cu: dl.danhSachThiDua, moi: kq.danhSach)
+                    }
                 }
+                self.thayTheBangThiDuaKhiQuet = false
                 if !kq.thiDuaNhanVien.isEmpty {
                     dl.thiDuaNhanVien = KhoDuLieu.dungChung.gopKetQuaThiDuaNhanVien(
                         hienTai: dl.thiDuaNhanVien,

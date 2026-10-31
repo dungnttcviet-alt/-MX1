@@ -178,31 +178,44 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
     }
 }
 
-// MARK: - 2. Màn hình Chia Target Mặt Hàng Cho Nhân Viên (Từ ngày 1 đến hiện tại)
-// (Tương đương phần 1 của ModalCaiDatDMX trong dmx-settings-modal.tsx)
+// MARK: - 2. Màn hình Chia Target Mặt Hàng Cho Nhân Viên (Đồng bộ 2 chiều với Target trong Thi Đua)
 
 final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let ngay: Date
+    private var khoaNganhChonMacDinh: String?
     private var caiDat = KhoDuLieu.dungChung.caiDat
     private var danhSachMatHang: [DongThiDua] = []
     private var chiSoMatHangDangChon: Int = 0
 
     private let nutChonMatHang = UIButton(type: .system)
     private let nhanTomTat = UILabel()
+    private let nutSuaTarget = UIButton(type: .system)
     private let bang = UITableView(frame: .zero, style: .insetGrouped)
 
     init(ngay: Date = Date(), khoaNganhChonMacDinh: String? = nil) {
         self.ngay = ngay
+        self.khoaNganhChonMacDinh = khoaNganhChonMacDinh
         super.init(nibName: nil, bundle: nil)
-        self.danhSachMatHang = KhoDuLieu.dungChung.danhSachMatHangThang(den: ngay)
-        if let khoa = khoaNganhChonMacDinh,
-           let idx = danhSachMatHang.firstIndex(where: { KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHang) == khoa }) {
-            self.chiSoMatHangDangChon = idx
-        }
+        napLaiDanhSachMatHang()
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    private func napLaiDanhSachMatHang() {
+        caiDat = KhoDuLieu.dungChung.caiDat
+        let khoaDangChonHienTai = matHangHienTai.map { KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHang) } ?? khoaNganhChonMacDinh
+        danhSachMatHang = KhoDuLieu.dungChung.danhSachMatHangThang(den: ngay)
+        if let khoa = khoaDangChonHienTai,
+           let idx = danhSachMatHang.firstIndex(where: {
+               KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHang) == khoa ||
+               KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHangGoc) == khoa
+           }) {
+            chiSoMatHangDangChon = idx
+        } else if chiSoMatHangDangChon >= danhSachMatHang.count {
+            chiSoMatHangDangChon = max(0, danhSachMatHang.count - 1)
+        }
     }
 
     override func viewDidLoad() {
@@ -211,6 +224,12 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         view.backgroundColor = .systemGroupedBackground
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Lưu", style: .done, target: self, action: #selector(luu))
         taoGiaoDien()
+        capNhatGiaoDien()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        napLaiDanhSachMatHang()
         capNhatGiaoDien()
     }
 
@@ -233,6 +252,15 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         nhanTomTat.font = .systemFont(ofSize: 13, weight: .semibold)
         nhanTomTat.textColor = .secondaryLabel
         nhanTomTat.numberOfLines = 2
+
+        nutSuaTarget.setImage(UIImage(systemName: "pencil.line"), for: .normal)
+        nutSuaTarget.setTitle(" Sửa Target & ĐVT (Đồng bộ Thi đua)", for: .normal)
+        nutSuaTarget.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
+        nutSuaTarget.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.14)
+        nutSuaTarget.tintColor = .systemOrange
+        nutSuaTarget.layer.cornerRadius = 8
+        nutSuaTarget.contentEdgeInsets = UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        nutSuaTarget.addTarget(self, action: #selector(bamSuaTargetMatHang), for: .touchUpInside)
 
         let nutChonHet = UIButton(type: .system)
         nutChonHet.setImage(UIImage(systemName: "checkmark.square.fill"), for: .normal)
@@ -259,7 +287,7 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         hangNutNhanh.spacing = 8
         hangNutNhanh.distribution = .fillEqually
 
-        let nganTren = UIStackView(arrangedSubviews: [nutChonMatHang, nhanTomTat, hangNutNhanh])
+        let nganTren = UIStackView(arrangedSubviews: [nutChonMatHang, nhanTomTat, nutSuaTarget, hangNutNhanh])
         nganTren.axis = .vertical
         nganTren.spacing = 8
         nganTren.translatesAutoresizingMaskIntoConstraints = false
@@ -295,31 +323,39 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         return danhSachMatHang[chiSoMatHangDangChon]
     }
 
+    private func luuDanhSachMaNV(_ dsMa: [String], cho mh: DongThiDua) {
+        let k1 = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
+        let k2 = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHangGoc)
+        if !k1.isEmpty { caiDat.chiaTargetNganhHang[k1] = dsMa }
+        if !k2.isEmpty { caiDat.chiaTargetNganhHang[k2] = dsMa }
+        KhoDuLieu.dungChung.luuCaiDat(caiDat)
+    }
+
     private func capNhatGiaoDien() {
         guard let mh = matHangHienTai else {
-            nutChonMatHang.setTitle("Chưa có mặt hàng nào được quét trong tháng", for: .normal)
-            nhanTomTat.text = "Hãy quét ảnh Thi đua trước để chia Target cho nhân viên."
+            nutChonMatHang.setTitle("Chưa có mặt hàng nào được quét trong Bảng Thi Đua", for: .normal)
+            nhanTomTat.text = "Hãy quét ảnh Thi đua trước để đồng bộ Target chia cho nhân viên."
+            nutSuaTarget.isHidden = true
             bang.reloadData()
             return
         }
-        let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
-        let dsChon = caiDat.chiaTargetNganhHang[khoa] ?? caiDat.danhSachNhanVien.map(\.maNV)
+        nutSuaTarget.isHidden = false
+        let dsChon = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: mh, trong: caiDat)
         let soNV = dsChon.count
         let moiNV = soNV > 0 ? mh.target / Double(soNV) : 0
 
-        nutChonMatHang.setTitle("📦 \(mh.tenNganhHang) ▾", for: .normal)
-        nhanTomTat.text = "Target tổng: \(mh.target.chuoiSoGonVN) (\(mh.loaiChiTieu.maBang))  •  Đã chọn: \(soNV)/\(caiDat.danhSachNhanVien.count) NV  →  Mỗi NV: \(moiNV.chuoiSoVN)"
+        nutChonMatHang.setTitle("📦 (\(chiSoMatHangDangChon + 1)/\(danhSachMatHang.count)) \(mh.tenNganhHang) [\(mh.loaiChiTieu.maBang)] ▾", for: .normal)
+        nhanTomTat.text = "Target Thi đua: \(mh.target.chuoiSoGonVN) (\(mh.loaiChiTieu.maBang)) • Thực hiện: \(mh.thucHien.chuoiSoGonVN)\nĐã chọn: \(soNV)/\(caiDat.danhSachNhanVien.count) NV  →  Mỗi NV: \(moiNV.chuoiSoVN)"
         bang.reloadData()
     }
 
     @objc private func bamChonMatHang() {
         guard !danhSachMatHang.isEmpty else { return }
-        let sheet = UIAlertController(title: "Chọn mặt hàng (\(danhSachMatHang.count) mặt hàng)", message: nil, preferredStyle: .actionSheet)
+        let sheet = UIAlertController(title: "Chọn mặt hàng (\(danhSachMatHang.count) mặt hàng từ Thi đua)", message: nil, preferredStyle: .actionSheet)
         for (i, mh) in danhSachMatHang.enumerated() {
-            let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
-            let dsChon = caiDat.chiaTargetNganhHang[khoa] ?? caiDat.danhSachNhanVien.map(\.maNV)
+            let dsChon = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: mh, trong: caiDat)
             let moiNV = dsChon.isEmpty ? 0 : mh.target / Double(dsChon.count)
-            let tieuDe = "\(mh.tenNganhHang) — Target: \(mh.target.chuoiSoGonVN) (\(dsChon.count) NV → \(moiNV.chuoiSoGonVN)/NV)"
+            let tieuDe = "\(i + 1). \(mh.tenNganhHang) [\(mh.loaiChiTieu.maBang)] — Target: \(mh.target.chuoiSoGonVN) (\(dsChon.count) NV → \(moiNV.chuoiSoGonVN)/NV)"
             sheet.addAction(UIAlertAction(title: tieuDe, style: .default) { [weak self] _ in
                 self?.chiSoMatHangDangChon = i
                 self?.capNhatGiaoDien()
@@ -333,17 +369,64 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         present(sheet, animated: true)
     }
 
+    @objc private func bamSuaTargetMatHang() {
+        guard let mh = matHangHienTai else { return }
+        let hop = UIAlertController(
+            title: "Sửa Target: \(mh.tenNganhHang)",
+            message: "Target mới và đơn vị tính (DT / SL) sẽ được đồng bộ trực tiếp với Bảng Thi Đua ngoài màn hình chính:",
+            preferredStyle: .alert
+        )
+        hop.addTextField { tf in
+            tf.placeholder = "Target tổng (VD: 237.51)"
+            tf.keyboardType = .decimalPad
+            tf.text = mh.target > 0 ? mh.target.chuoiSoGonVN : ""
+        }
+        hop.addAction(UIAlertAction(title: "💾 Lưu (ĐVT: DT - Doanh thu)", style: .default) { [weak self] _ in
+            self?.luuTargetMoiTuHopThoai(hop, loai: .doanhThu)
+        })
+        hop.addAction(UIAlertAction(title: "💾 Lưu (ĐVT: SL - Số lượng)", style: .default) { [weak self] _ in
+            self?.luuTargetMoiTuHopThoai(hop, loai: .soLuong)
+        })
+        hop.addAction(UIAlertAction(title: "Huỷ", style: .cancel))
+        present(hop, animated: true)
+    }
+
+    private func luuTargetMoiTuHopThoai(_ hop: UIAlertController, loai: LoaiChiTieuThiDua) {
+        guard let mh = matHangHienTai else { return }
+        let chuoi = (hop.textFields?.first?.text ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+        let giaTri: Double
+        if let raw = hop.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            if raw.contains(",") && !raw.contains(".") {
+                giaTri = Double(raw.replacingOccurrences(of: ",", with: ".")) ?? mh.target
+            } else {
+                giaTri = Double(raw) ?? Double(chuoi) ?? mh.target
+            }
+        } else {
+            giaTri = mh.target
+        }
+
+        KhoDuLieu.dungChung.capNhatTargetNganhHang(
+            dongGoc: mh,
+            targetMoi: max(0, giaTri),
+            loaiChiTieuMoi: loai,
+            cho: ngay
+        )
+        napLaiDanhSachMatHang()
+        capNhatGiaoDien()
+    }
+
     @objc private func chonTatCa() {
         guard let mh = matHangHienTai else { return }
-        let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
-        caiDat.chiaTargetNganhHang[khoa] = caiDat.danhSachNhanVien.map(\.maNV)
+        luuDanhSachMaNV(caiDat.danhSachNhanVien.map(\.maNV), cho: mh)
         capNhatGiaoDien()
     }
 
     @objc private func boChonTatCa() {
         guard let mh = matHangHienTai else { return }
-        let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
-        caiDat.chiaTargetNganhHang[khoa] = []
+        luuDanhSachMaNV([], cho: mh)
         capNhatGiaoDien()
     }
 
@@ -355,14 +438,13 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         let cell = tableView.dequeueReusableCell(withIdentifier: "Chia") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "Chia")
         guard let mh = matHangHienTai else { return cell }
         let nv = caiDat.danhSachNhanVien[indexPath.row]
-        let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
-        let ds = caiDat.chiaTargetNganhHang[khoa] ?? caiDat.danhSachNhanVien.map(\.maNV)
+        let ds = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: mh, trong: caiDat)
         let checked = ds.contains(nv.maNV)
         let moiNV = ds.isEmpty ? 0 : mh.target / Double(ds.count)
 
         cell.textLabel?.text = "\(nv.maNV) - \(nv.hoTen)"
         cell.textLabel?.font = .systemFont(ofSize: 14.5, weight: .bold)
-        cell.detailTextLabel?.text = "Target: \(checked ? moiNV.chuoiSoVN : "0")"
+        cell.detailTextLabel?.text = "Target cá nhân: \(checked ? moiNV.chuoiSoVN : "0") (\(mh.loaiChiTieu.maBang))"
         cell.detailTextLabel?.textColor = checked ? .systemBlue : .secondaryLabel
         cell.accessoryType = checked ? .checkmark : .none
         return cell
@@ -371,15 +453,14 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         guard let mh = matHangHienTai, indexPath.row < caiDat.danhSachNhanVien.count else { return }
-        let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(mh.tenNganhHang)
         let ma = caiDat.danhSachNhanVien[indexPath.row].maNV
-        var ds = caiDat.chiaTargetNganhHang[khoa] ?? caiDat.danhSachNhanVien.map(\.maNV)
+        var ds = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: mh, trong: caiDat)
         if let i = ds.firstIndex(of: ma) {
             ds.remove(at: i)
         } else {
             ds.append(ma)
         }
-        caiDat.chiaTargetNganhHang[khoa] = ds
+        luuDanhSachMaNV(ds, cho: mh)
         capNhatGiaoDien()
     }
 

@@ -939,9 +939,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
             dong.phanTramDuBao.chuoiPhanTram
         ]
 
-        let cd = KhoDuLieu.dungChung.caiDat
-        let khoaNganh = KhoDuLieu.chuanHoaKhoaSoSanh(dong.tenNganhHang)
-        let soNVGiao = (cd.chiaTargetNganhHang[khoaNganh] ?? cd.danhSachNhanVien.map(\.maNV)).count
+        let soNVGiao = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: dong).count
         let moiNV = soNVGiao > 0 ? (dong.target / Double(soNVGiao)) : 0
 
         var xHienTai: CGFloat = 0
