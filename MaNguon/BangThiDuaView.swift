@@ -552,6 +552,7 @@ final class OTheThiDuaCell: UICollectionViewCell {
 
 final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UITableViewDataSource, UITableViewDelegate {
     var khiChonDong: ((DongThiDua) -> Void)?
+    var khiSuaDong: ((DongThiDua) -> Void)?
     var khiXoaDong: ((UUID) -> Void)?
     var khiBamQuetAnh: (() -> Void)?
 
@@ -562,7 +563,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
     private var soCotTrenDienThoai: Int = 1
 
     // Chiều rộng 8 cột cho Mẫu 1 (Bảng 8 cột chi tiết)
-    private let chieuRongCot: [CGFloat] = [38, 205, 48, 88, 88, 92, 84, 84]
+    private let chieuRongCot: [CGFloat] = [38, 210, 48, 88, 88, 92, 84, 84]
     private var tongChieuRongBang: CGFloat { chieuRongCot.reduce(0, +) }
 
     private let chonBoLoc = UISegmentedControl(items: ["Tất cả", "Đạt", "Chưa đạt"])
@@ -647,7 +648,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
 
         bang8Cot.dataSource = self
         bang8Cot.delegate = self
-        bang8Cot.rowHeight = 52
+        bang8Cot.rowHeight = 56
         bang8Cot.sectionHeaderHeight = 40
         bang8Cot.separatorStyle = .singleLine
         bang8Cot.separatorInset = .zero
@@ -673,7 +674,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         tieuDeTrong.textAlignment = .center
 
         let phuDeTrong = UILabel()
-        phuDeTrong.text = "Chọn nhiều ảnh chụp cuộn trang cùng lúc.\nĐổi kiểu hiển thị (Bảng 8 cột / Thẻ gọn) trong Cài đặt (⚙️)."
+        phuDeTrong.text = "Bấm vào từng ngành hàng sau khi quét để xem xếp hạng nhân viên & nhập ảnh thực hiện nhân viên.\nChia Target mặt hàng cho nhân viên trong Cài đặt (⚙️)."
         phuDeTrong.font = .systemFont(ofSize: 12.5, weight: .regular)
         phuDeTrong.textColor = .secondaryLabel
         phuDeTrong.textAlignment = .center
@@ -858,7 +859,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         cell.contentView.subviews.forEach { $0.removeFromSuperview() }
 
         let dong = danhSachHienThi[indexPath.row]
-        let viewDong = taoViewDongDuLieu8Cot(stt: indexPath.row + 1, dong: dong)
+        let viewDong = taoViewDongDuLieu8Cot(stt: indexPath.row + 1, dong: dong, chieuCao: 56, hienNhanNV: true)
         viewDong.translatesAutoresizingMaskIntoConstraints = false
         cell.contentView.addSubview(viewDong)
 
@@ -882,14 +883,19 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
             self?.khiXoaDong?(dong.id)
             hoanTat(true)
         }
-        return UISwipeActionsConfiguration(actions: [xoa])
+        let sua = UIContextualAction(style: .normal, title: "Sửa") { [weak self] _, _, hoanTat in
+            self?.khiSuaDong?(dong)
+            hoanTat(true)
+        }
+        sua.backgroundColor = .systemBlue
+        return UISwipeActionsConfiguration(actions: [xoa, sua])
     }
 
     private func taoDongTieuDeCot() -> UIView {
         let khung = UIView(frame: CGRect(x: 0, y: 0, width: tongChieuRongBang, height: 40))
         khung.backgroundColor = UIColor.systemGray5
 
-        let tieuDe = ["STT", "NGÀNH HÀNG (CHƯƠNG TRÌNH)", "ĐVT", "THỰC HIỆN", "TARGET", "THIẾU/VƯỢT", "% HT THÁNG", "% DỰ BÁO"]
+        let tieuDe = ["STT", "NGÀNH HÀNG (BẤM XEM NV)", "ĐVT", "THỰC HIỆN", "TARGET", "THIẾU/VƯỢT", "% HT THÁNG", "% DỰ BÁO"]
         var xHienTai: CGFloat = 0
 
         for (i, chu) in tieuDe.enumerated() {
@@ -916,7 +922,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         return khung
     }
 
-    private func taoViewDongDuLieu8Cot(stt: Int, dong: DongThiDua, chieuCao: CGFloat = 52) -> UIView {
+    private func taoViewDongDuLieu8Cot(stt: Int, dong: DongThiDua, chieuCao: CGFloat = 52, hienNhanNV: Bool = false) -> UIView {
         let khung = UIView(frame: CGRect(x: 0, y: 0, width: tongChieuRongBang, height: chieuCao))
         let dat = dong.daDat
         khung.backgroundColor = dat
@@ -942,13 +948,18 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
             dong.phanTramDuBao.chuoiPhanTram
         ]
 
+        let cd = KhoDuLieu.dungChung.caiDat
+        let khoaNganh = KhoDuLieu.chuanHoaKhoaSoSanh(dong.tenNganhHang)
+        let soNVGiao = (cd.chiaTargetNganhHang[khoaNganh] ?? cd.danhSachNhanVien.map(\.maNV)).count
+        let moiNV = soNVGiao > 0 ? (dong.target / Double(soNVGiao)) : 0
+
         var xHienTai: CGFloat = 0
         for i in 0..<giaTriCot.count {
             let rong = chieuRongCot[i]
             let khungO = CGRect(x: xHienTai, y: 0, width: rong, height: chieuCao)
 
             if i == 6 || i == 7 {
-                let badge = UILabel(frame: khungO.insetBy(dx: 6, dy: 10))
+                let badge = UILabel(frame: khungO.insetBy(dx: 6, dy: (chieuCao - 30) / 2))
                 badge.text = giaTriCot[i]
                 badge.font = .monospacedDigitSystemFont(ofSize: 12, weight: .bold)
                 badge.textAlignment = .center
@@ -957,6 +968,18 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
                 badge.layer.cornerRadius = 8
                 badge.clipsToBounds = true
                 khung.addSubview(badge)
+            } else if i == 1 && hienNhanNV {
+                let lbTen = UILabel(frame: CGRect(x: xHienTai + 6, y: 4, width: rong - 12, height: 32))
+                lbTen.text = dong.tenNganhHang
+                lbTen.font = .systemFont(ofSize: 12.5, weight: .bold)
+                lbTen.textColor = mauChuChinh
+                lbTen.numberOfLines = 2
+                let lbNV = UILabel(frame: CGRect(x: xHienTai + 6, y: 36, width: rong - 12, height: 15))
+                lbNV.text = "👥 \(soNVGiao) NV (\(String(format: "%.1f", moiNV))/NV)"
+                lbNV.font = .systemFont(ofSize: 10.5, weight: .semibold)
+                lbNV.textColor = .systemBlue
+                khung.addSubview(lbTen)
+                khung.addSubview(lbNV)
             } else {
                 let nhan = UILabel(frame: khungO.insetBy(dx: 6, dy: 4))
                 nhan.text = giaTriCot[i]
@@ -1066,7 +1089,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
 
         for (i, dong) in ds.enumerated() {
             let y = chieuCaoHeaderCot + CGFloat(i) * chieuCaoDong
-            let vDong = taoViewDongDuLieu8Cot(stt: i + 1, dong: dong, chieuCao: chieuCaoDong)
+            let vDong = taoViewDongDuLieu8Cot(stt: i + 1, dong: dong, chieuCao: chieuCaoDong, hienNhanNV: false)
             vDong.frame = CGRect(x: 0, y: y, width: tongChieuRongBang, height: chieuCaoDong)
             let vach = UIView(frame: CGRect(x: 0, y: chieuCaoDong - 0.5, width: tongChieuRongBang, height: 0.5))
             vach.backgroundColor = .systemGray4

@@ -2,18 +2,152 @@ import UIKit
 
 enum LoaiTabMuc: Int, CaseIterable {
     case thiDua = 0
-    case duPhong1 = 1
+    case nhanVien = 1
     case duPhong2 = 2
     case duPhong3 = 3
 
     var tieuDe: String {
         switch self {
         case .thiDua: return "Thi đua"
-        case .duPhong1: return "Dự phòng 1"
+        case .nhanVien: return "Nhân viên"
         case .duPhong2: return "Dự phòng 2"
         case .duPhong3: return "Dự phòng 3"
         }
     }
+}
+
+enum KieuSapXepNhanVien: Int, CaseIterable {
+    case soMonHoanThanh = 0
+    case doanhThuQD = 1
+    case phanTramTB = 2
+
+    var nhan: String {
+        switch self {
+        case .soMonHoanThanh: return "🏆 Số môn hoàn thành (Cao → Thấp)"
+        case .doanhThuQD: return "🎯 Doanh thu QĐ (Cao → Thấp)"
+        case .phanTramTB: return "📈 % HT thi đua TB (Cao → Thấp)"
+        }
+    }
+
+    var nhanNgan: String {
+        switch self {
+        case .soMonHoanThanh: return "Số môn HT"
+        case .doanhThuQD: return "DT QĐ"
+        case .phanTramTB: return "% HT TB"
+        }
+    }
+}
+
+struct NhanVienQuanLy: Codable, Hashable, Identifiable {
+    var maNV: String
+    var hoTen: String
+    var id: String { maNV }
+}
+
+struct DoanhThuNhanVienItem: Codable, Hashable {
+    var maNV: String
+    var hoTen: String
+    var soLuong: Double = 0
+    var doanhThuThuc: Double = 0
+    var doanhThuQD: Double = 0
+    var target: Double = 0
+    var dtQDKhoanVay: Double = 0
+    var dtTraThangQD: Double = 0
+    var dtTraGop: Double = 0
+    var phanTramHT: Double = 0
+    var phanTramQuyDoi: Double = 0
+    var phanTramTraGop: Double = 0
+    var gioCong: Double = 0
+    var soNgayNghi: Double = 0
+    var nangSuat: Double = 0
+
+    init(
+        maNV: String,
+        hoTen: String,
+        soLuong: Double = 0,
+        doanhThuThuc: Double = 0,
+        doanhThuQD: Double = 0,
+        target: Double = 0,
+        dtQDKhoanVay: Double = 0,
+        dtTraThangQD: Double = 0,
+        dtTraGop: Double = 0,
+        phanTramHT: Double = 0,
+        phanTramQuyDoi: Double = 0,
+        phanTramTraGop: Double = 0,
+        gioCong: Double = 0,
+        soNgayNghi: Double = 0,
+        nangSuat: Double = 0
+    ) {
+        self.maNV = maNV
+        self.hoTen = hoTen
+        self.soLuong = soLuong
+        self.doanhThuThuc = doanhThuThuc
+        self.doanhThuQD = doanhThuQD
+        self.target = target
+        self.dtQDKhoanVay = dtQDKhoanVay
+        self.dtTraThangQD = dtTraThangQD
+        self.dtTraGop = dtTraGop
+        self.phanTramHT = phanTramHT
+        self.phanTramQuyDoi = phanTramQuyDoi
+        self.phanTramTraGop = phanTramTraGop
+        self.gioCong = gioCong
+        self.soNgayNghi = soNgayNghi
+        self.nangSuat = nangSuat
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        maNV = (try? c.decode(String.self, forKey: .maNV)) ?? ""
+        hoTen = (try? c.decode(String.self, forKey: .hoTen)) ?? ""
+        soLuong = (try? c.decode(Double.self, forKey: .soLuong)) ?? 0
+        doanhThuThuc = (try? c.decode(Double.self, forKey: .doanhThuThuc)) ?? 0
+        doanhThuQD = (try? c.decode(Double.self, forKey: .doanhThuQD)) ?? 0
+        target = (try? c.decode(Double.self, forKey: .target)) ?? 0
+        dtQDKhoanVay = (try? c.decode(Double.self, forKey: .dtQDKhoanVay)) ?? 0
+        dtTraThangQD = (try? c.decode(Double.self, forKey: .dtTraThangQD)) ?? 0
+        dtTraGop = (try? c.decode(Double.self, forKey: .dtTraGop)) ?? 0
+        phanTramHT = (try? c.decode(Double.self, forKey: .phanTramHT)) ?? 0
+        phanTramQuyDoi = (try? c.decode(Double.self, forKey: .phanTramQuyDoi)) ?? 0
+        phanTramTraGop = (try? c.decode(Double.self, forKey: .phanTramTraGop)) ?? 0
+        gioCong = (try? c.decode(Double.self, forKey: .gioCong)) ?? 0
+        soNgayNghi = (try? c.decode(Double.self, forKey: .soNgayNghi)) ?? 0
+        nangSuat = (try? c.decode(Double.self, forKey: .nangSuat)) ?? 0
+    }
+}
+
+struct DongXepHangNhanVienNganh: Hashable {
+    var maNV: String
+    var hoTen: String
+    var thucHien: Double
+    var targetCaNhan: Double
+    var phanTramHT: Double
+    var chenhLech: Double { thucHien - targetCaNhan }
+    var daDat: Bool { phanTramHT >= 99.995 }
+}
+
+struct MonThiDuaNhanVien: Hashable {
+    var khoaNganh: String
+    var tenNganhHang: String
+    var loaiChiTieu: LoaiChiTieuThiDua
+    var thucHien: Double
+    var targetCaNhan: Double
+    var phanTramHT: Double
+    var phanTramSieuThi: Double
+    var conLai: Double { targetCaNhan - thucHien }
+    var daDat: Bool { phanTramHT >= 99.995 }
+}
+
+struct TongHopNhanVien: Hashable {
+    var nhanVien: NhanVienQuanLy
+    var soMonDat: Int
+    var tongMonGiao: Int
+    var phanTramHTTB: Double
+    var doanhThuQD: Double
+    var soLuongDon: Double
+    var dtQDKhoanVay: Double
+    var dtTraThangQD: Double
+    var cacMonGiao: [MonThiDuaNhanVien]
+    var doanhThuCaNhan: DoanhThuNhanVienItem?
 }
 
 enum KieuHienThiBaoCao: Int, Codable, CaseIterable {
@@ -25,6 +159,29 @@ enum KieuHienThiBaoCao: Int, Codable, CaseIterable {
         case .bangChiTiet: return "Bảng 8 cột"
         case .theGon: return "Thẻ tiến độ"
         }
+    }
+
+    var maWeb: String {
+        switch self {
+        case .bangChiTiet: return "bangChiTiet"
+        case .theGon: return "theGon"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let rawInt = try? container.decode(Int.self), let val = KieuHienThiBaoCao(rawValue: rawInt) {
+            self = val
+        } else if let rawStr = try? container.decode(String.self) {
+            self = (rawStr == "theGon") ? .theGon : .bangChiTiet
+        } else {
+            self = .bangChiTiet
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(maWeb)
     }
 }
 
@@ -161,6 +318,9 @@ struct ThongTinDoanhThu: Codable, Hashable {
     /// % Hoàn thành QĐ dự kiến
     var phanTramHTQDDuKienHienThi: Double {
         if phanTramHTQuyDoi > 0 { return phanTramHTQuyDoi }
+        if duKienQuyDoi > 0, targetQuyDoi > 0 {
+            return (duKienQuyDoi / targetQuyDoi) * 100.0
+        }
         if targetQuyDoi > 0, doanhThuQuyDoi > 0 {
             return (doanhThuQuyDoi / targetQuyDoi) * 100.0
         }
@@ -205,7 +365,7 @@ struct ThongTinDoanhThu: Codable, Hashable {
 }
 
 struct DongThiDua: Codable, Hashable, Identifiable {
-    var id = UUID()
+    var id: UUID = UUID()
     var tenNganhHangGoc: String
     var tenNganhHang: String
     var loaiChiTieu: LoaiChiTieuThiDua
@@ -213,6 +373,17 @@ struct DongThiDua: Codable, Hashable, Identifiable {
     var target: Double
     var phanTramHTGoc: Double?
     var phanTramDuBaoGoc: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case tenNganhHangGoc
+        case tenNganhHang
+        case loaiChiTieu
+        case thucHien
+        case target
+        case phanTramHTGoc
+        case phanTramDuBaoGoc
+    }
 
     init(
         id: UUID = UUID(),
@@ -233,6 +404,38 @@ struct DongThiDua: Codable, Hashable, Identifiable {
         self.target = target
         self.phanTramHTGoc = phanTramHTGoc
         self.phanTramDuBaoGoc = phanTramDuBaoGoc
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let uuid = try? c.decode(UUID.self, forKey: .id) {
+            id = uuid
+        } else if let str = try? c.decode(String.self, forKey: .id), let uuid = UUID(uuidString: str) {
+            id = uuid
+        } else {
+            id = UUID()
+        }
+        let ten = (try? c.decode(String.self, forKey: .tenNganhHang)) ?? ""
+        let goc = (try? c.decode(String.self, forKey: .tenNganhHangGoc)) ?? ten
+        tenNganhHangGoc = goc
+        tenNganhHang = ten.isEmpty ? goc : ten
+        loaiChiTieu = (try? c.decode(LoaiChiTieuThiDua.self, forKey: .loaiChiTieu)) ?? .doanhThu
+        thucHien = (try? c.decode(Double.self, forKey: .thucHien)) ?? 0
+        target = (try? c.decode(Double.self, forKey: .target)) ?? 0
+        phanTramHTGoc = try? c.decode(Double.self, forKey: .phanTramHTGoc)
+        phanTramDuBaoGoc = try? c.decode(Double.self, forKey: .phanTramDuBaoGoc)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id.uuidString.lowercased(), forKey: .id)
+        try c.encode(tenNganhHangGoc, forKey: .tenNganhHangGoc)
+        try c.encode(tenNganhHang, forKey: .tenNganhHang)
+        try c.encode(loaiChiTieu, forKey: .loaiChiTieu)
+        try c.encode(thucHien, forKey: .thucHien)
+        try c.encode(target, forKey: .target)
+        try c.encodeIfPresent(phanTramHTGoc, forKey: .phanTramHTGoc)
+        try c.encodeIfPresent(phanTramDuBaoGoc, forKey: .phanTramDuBaoGoc)
     }
 
     var chenhLech: Double {
@@ -281,6 +484,52 @@ struct CaiDatDMX: Codable {
     var kieuHienThi: KieuHienThiBaoCao = .bangChiTiet
     var danhSachCumTuLocBo: [String] = []
     var soCotXuatAnh: Int = 3
+    var danhSachNhanVien: [NhanVienQuanLy] = CaiDatDMX.nhanVienMau
+    var chiaTargetNganhHang: [String: [String]] = [:]
+
+    static let nhanVienMau: [NhanVienQuanLy] = [
+        .init(maNV: "24939", hoTen: "Phan Hoàng Sơn"),
+        .init(maNV: "201962", hoTen: "Nguyễn Thị Kim Loan"),
+        .init(maNV: "261423", hoTen: "Trần Nam Tùng"),
+        .init(maNV: "23986", hoTen: "Nguyễn Ngọc Đẩu"),
+        .init(maNV: "65255", hoTen: "Nguyễn Thị Thu Thảo"),
+        .init(maNV: "285688", hoTen: "Lê Tuấn"),
+        .init(maNV: "116719", hoTen: "Đinh Thị Quỳnh Nga"),
+        .init(maNV: "186532", hoTen: "Đỗ Thị Mỹ Linh"),
+        .init(maNV: "207241", hoTen: "Huỳnh Tấn Thành"),
+        .init(maNV: "194649", hoTen: "Nguyễn Hoàn Điện"),
+        .init(maNV: "34922", hoTen: "Đỗ Thị Chanh"),
+        .init(maNV: "293044", hoTen: "Võ Ngọc Vĩ"),
+        .init(maNV: "285681", hoTen: "Hồ Ngọc Châu Ánh"),
+        .init(maNV: "280417", hoTen: "Huỳnh Thành Đạt"),
+        .init(maNV: "39665", hoTen: "Nguyễn Hữu Kha"),
+        .init(maNV: "23997", hoTen: "Lê Thị Kim Phượng")
+    ]
+
+    init(
+        kieuHienThi: KieuHienThiBaoCao = .bangChiTiet,
+        danhSachCumTuLocBo: [String] = [],
+        soCotXuatAnh: Int = 3,
+        danhSachNhanVien: [NhanVienQuanLy] = CaiDatDMX.nhanVienMau,
+        chiaTargetNganhHang: [String: [String]] = [:]
+    ) {
+        self.kieuHienThi = kieuHienThi
+        self.danhSachCumTuLocBo = danhSachCumTuLocBo
+        self.soCotXuatAnh = soCotXuatAnh
+        self.danhSachNhanVien = danhSachNhanVien
+        self.chiaTargetNganhHang = chiaTargetNganhHang
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kieuHienThi = (try? c.decode(KieuHienThiBaoCao.self, forKey: .kieuHienThi)) ?? .bangChiTiet
+        danhSachCumTuLocBo = (try? c.decode([String].self, forKey: .danhSachCumTuLocBo)) ?? []
+        let cot = (try? c.decode(Int.self, forKey: .soCotXuatAnh)) ?? 3
+        soCotXuatAnh = (cot >= 1 && cot <= 4) ? cot : 3
+        let dsNV = (try? c.decode([NhanVienQuanLy].self, forKey: .danhSachNhanVien)) ?? []
+        danhSachNhanVien = dsNV.isEmpty ? Self.nhanVienMau : dsNV
+        chiaTargetNganhHang = (try? c.decode([String: [String]].self, forKey: .chiaTargetNganhHang)) ?? [:]
+    }
 }
 
 struct DuLieuNgayDMX: Codable {
@@ -289,6 +538,37 @@ struct DuLieuNgayDMX: Codable {
     var thongTinDonVi: String
     var doanhThu: ThongTinDoanhThu
     var danhSachThiDua: [DongThiDua]
+    var thiDuaNhanVien: [String: [String: Double]] = [:]
+    var doanhThuNhanVien: [DoanhThuNhanVienItem] = []
+
+    init(
+        khoaNgay: String,
+        capNhatLuc: String,
+        thongTinDonVi: String,
+        doanhThu: ThongTinDoanhThu,
+        danhSachThiDua: [DongThiDua],
+        thiDuaNhanVien: [String: [String: Double]] = [:],
+        doanhThuNhanVien: [DoanhThuNhanVienItem] = []
+    ) {
+        self.khoaNgay = khoaNgay
+        self.capNhatLuc = capNhatLuc
+        self.thongTinDonVi = thongTinDonVi
+        self.doanhThu = doanhThu
+        self.danhSachThiDua = danhSachThiDua
+        self.thiDuaNhanVien = thiDuaNhanVien
+        self.doanhThuNhanVien = doanhThuNhanVien
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        khoaNgay = (try? c.decode(String.self, forKey: .khoaNgay)) ?? ""
+        capNhatLuc = (try? c.decode(String.self, forKey: .capNhatLuc)) ?? ""
+        thongTinDonVi = (try? c.decode(String.self, forKey: .thongTinDonVi)) ?? ""
+        doanhThu = (try? c.decode(ThongTinDoanhThu.self, forKey: .doanhThu)) ?? ThongTinDoanhThu()
+        danhSachThiDua = (try? c.decode([DongThiDua].self, forKey: .danhSachThiDua)) ?? []
+        thiDuaNhanVien = (try? c.decode([String: [String: Double]].self, forKey: .thiDuaNhanVien)) ?? [:]
+        doanhThuNhanVien = (try? c.decode([DoanhThuNhanVienItem].self, forKey: .doanhThuNhanVien)) ?? []
+    }
 }
 
 final class ThuMucDuLieu {
@@ -382,6 +662,7 @@ final class KhoDuLieu {
     func luu(_ duLieu: DuLieuNgayDMX) {
         cacNgay[duLieu.khoaNgay] = duLieu
         ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
+        DichVuDongBo.dungChung.dayDuLieuNgay(duLieu)
     }
 
     func luuCaiDat(_ moi: CaiDatDMX) {
@@ -395,6 +676,233 @@ final class KhoDuLieu {
             cacNgay[khoa] = dl
         }
         ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
+        DichVuDongBo.dungChung.dayCaiDat(moi)
+    }
+
+    func nhapDuLieuDamMay(caiDat moi: CaiDatDMX?, cacNgay ngayMoi: [String: DuLieuNgayDMX]) {
+        if let moi { caiDat = moi }
+        for (khoa, var duLieu) in ngayMoi {
+            duLieu.khoaNgay = khoa
+            for i in duLieu.danhSachThiDua.indices {
+                let goc = duLieu.danhSachThiDua[i].tenNganhHangGoc
+                duLieu.danhSachThiDua[i].tenNganhHang = KhoDuLieu.apDungLocTuCaiDat(goc)
+            }
+            cacNgay[khoa] = duLieu
+        }
+        ThuMucDuLieu.dungChung.ghi(caiDat, vao: ThuMucDuLieu.dungChung.tepCaiDat)
+        ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
+    }
+
+    func datLaiSauDangXuat() {
+        caiDat = CaiDatDMX()
+        cacNgay = [:]
+        ThuMucDuLieu.dungChung.ghi(caiDat, vao: ThuMucDuLieu.dungChung.tepCaiDat)
+        ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
+    }
+
+    /// Danh sách tất cả mặt hàng từ ngày 1 đầu tháng đến ngày đang chọn
+    func danhSachMatHangThang(den ngay: Date) -> [DongThiDua] {
+        let khoaDen = TienIchNgay.khoa.string(from: ngay)
+        let tienTo = String(khoaDen.prefix(7))
+        var cacKhoa = cacNgay.keys.filter { $0.hasPrefix(tienTo) && $0 <= khoaDen }.sorted()
+        if !cacKhoa.contains(khoaDen) {
+            cacKhoa.append(khoaDen)
+        }
+
+        var map: [String: DongThiDua] = [:]
+        var thuTuKhoa: [String] = []
+        for khoa in cacKhoa {
+            let dl = (khoa == khoaDen) ? duLieu(cho: ngay) : cacNgay[khoa]
+            for var dong in dl?.danhSachThiDua ?? [] {
+                dong.tenNganhHang = Self.apDungLocTuCaiDat(dong.tenNganhHangGoc)
+                let k = Self.chuanHoaKhoaSoSanh(dong.tenNganhHang)
+                guard !k.isEmpty else { continue }
+                if map[k] == nil { thuTuKhoa.append(k) }
+                map[k] = dong
+            }
+        }
+        return thuTuKhoa.compactMap { map[$0] }
+    }
+
+    /// Tổng hợp số thực hiện mới nhất của từng nhân viên theo từng mặt hàng từ ngày 1 đến ngày hiện tại
+    func thucHienNhanVienTheoMatHangThang(den ngay: Date) -> [String: [String: Double]] {
+        let khoaDen = TienIchNgay.khoa.string(from: ngay)
+        let tienTo = String(khoaDen.prefix(7))
+        var cacKhoa = cacNgay.keys.filter { $0.hasPrefix(tienTo) && $0 <= khoaDen }.sorted()
+        if !cacKhoa.contains(khoaDen) {
+            cacKhoa.append(khoaDen)
+        }
+
+        var ketQua: [String: [String: Double]] = [:]
+        for khoa in cacKhoa {
+            let dl = (khoa == khoaDen) ? duLieu(cho: ngay) : cacNgay[khoa]
+            guard let bangNganh = dl?.thiDuaNhanVien else { continue }
+            for (khoaNganh, bangNV) in bangNganh {
+                ketQua[khoaNganh, default: [:]].merge(bangNV) { _, moi in moi }
+            }
+        }
+        return ketQua
+    }
+
+    /// Danh sách xếp hạng nhân viên cho 1 ngành hàng cụ thể (ModalChiTietNganhHang trên web)
+    func danhSachXepHangNhanVien(cho dong: DongThiDua, den ngay: Date) -> [DongXepHangNhanVienNganh] {
+        let khoaNganh = Self.chuanHoaKhoaSoSanh(dong.tenNganhHang)
+        let dsMaDuocChon = caiDat.chiaTargetNganhHang[khoaNganh] ?? caiDat.danhSachNhanVien.map(\.maNV)
+        let soNV = dsMaDuocChon.count
+        guard soNV > 0 else { return [] }
+
+        let targetCaNhan = dong.target / Double(soNV)
+        let bangTH = thucHienNhanVienTheoMatHangThang(den: ngay)[khoaNganh] ?? [:]
+
+        return dsMaDuocChon.map { maNV in
+            let nv = caiDat.danhSachNhanVien.first(where: { $0.maNV == maNV }) ?? NhanVienQuanLy(maNV: maNV, hoTen: "NV \(maNV)")
+            let thucHien = bangTH[maNV] ?? 0
+            let phanTramHT = targetCaNhan > 0.0001 ? (thucHien / targetCaNhan) * 100.0 : 0
+            return DongXepHangNhanVienNganh(
+                maNV: maNV,
+                hoTen: nv.hoTen,
+                thucHien: thucHien,
+                targetCaNhan: targetCaNhan,
+                phanTramHT: phanTramHT
+            )
+        }.sorted {
+            if abs($0.phanTramHT - $1.phanTramHT) > 0.001 {
+                return $0.phanTramHT > $1.phanTramHT
+            }
+            return $0.thucHien > $1.thucHien
+        }
+    }
+
+    /// Bảng tổng hợp nhân viên (Tab Nhân viên trên web)
+    func tongHopNhanVien(den ngay: Date, sapXep: KieuSapXepNhanVien = .soMonHoanThanh) -> [TongHopNhanVien] {
+        let matHang = danhSachMatHangThang(den: ngay)
+        let thucHienTheoNganh = thucHienNhanVienTheoMatHangThang(den: ngay)
+        let dlHienTai = duLieu(cho: ngay)
+        let dtNVList = dlHienTai.doanhThuNhanVien
+
+        // Nếu ngày hiện tại chưa có doanhThuNhanVien thì lấy bản mới nhất trong tháng
+        var dtFallbackTheoMa: [String: DoanhThuNhanVienItem] = [:]
+        let khoaDen = TienIchNgay.khoa.string(from: ngay)
+        let tienTo = String(khoaDen.prefix(7))
+        for khoa in cacNgay.keys.sorted() where khoa.hasPrefix(tienTo) && khoa <= khoaDen {
+            for item in cacNgay[khoa]?.doanhThuNhanVien ?? [] {
+                dtFallbackTheoMa[Self.chuanHoaMaNV(item.maNV)] = item
+            }
+        }
+
+        let dsNV = caiDat.danhSachNhanVien
+        var ketQua: [TongHopNhanVien] = dsNV.map { nv in
+            var cacMonGiao: [MonThiDuaNhanVien] = []
+            for mh in matHang {
+                let khoa = Self.chuanHoaKhoaSoSanh(mh.tenNganhHang)
+                let dsMaDuocGiao = caiDat.chiaTargetNganhHang[khoa] ?? dsNV.map(\.maNV)
+                guard dsMaDuocGiao.contains(nv.maNV) else { continue }
+
+                let soNguoiNhan = max(1, dsMaDuocGiao.count)
+                let targetCaNhan = mh.target / Double(soNguoiNhan)
+                let thucHien = thucHienTheoNganh[khoa]?[nv.maNV] ?? 0
+                let phanTramHT = targetCaNhan > 0.0001 ? (thucHien / targetCaNhan) * 100.0 : 0
+                let phanTramSieuThi = mh.target > 0.0001 ? (mh.thucHien / mh.target) * 100.0 : 0
+
+                cacMonGiao.append(MonThiDuaNhanVien(
+                    khoaNganh: khoa,
+                    tenNganhHang: mh.tenNganhHang,
+                    loaiChiTieu: mh.loaiChiTieu,
+                    thucHien: thucHien,
+                    targetCaNhan: targetCaNhan,
+                    phanTramHT: phanTramHT,
+                    phanTramSieuThi: phanTramSieuThi
+                ))
+            }
+
+            cacMonGiao.sort { $0.phanTramHT > $1.phanTramHT }
+            let soMonDat = cacMonGiao.filter(\.daDat).count
+            let tongMonGiao = cacMonGiao.count
+            let phanTramHTTB = tongMonGiao > 0 ? cacMonGiao.map(\.phanTramHT).reduce(0, +) / Double(tongMonGiao) : 0
+
+            let dtCaNhan = dtNVList.first(where: {
+                Self.chuanHoaMaNV($0.maNV) == nv.maNV ||
+                Self.khopNhanVienQuetVoiQuanLy(maQuet: $0.maNV, tenQuet: $0.hoTen, dsQuanLy: [nv]) != nil
+            }) ?? dtFallbackTheoMa[nv.maNV]
+
+            return TongHopNhanVien(
+                nhanVien: nv,
+                soMonDat: soMonDat,
+                tongMonGiao: tongMonGiao,
+                phanTramHTTB: phanTramHTTB,
+                doanhThuQD: dtCaNhan?.doanhThuQD ?? 0,
+                soLuongDon: dtCaNhan?.soLuong ?? 0,
+                dtQDKhoanVay: dtCaNhan?.dtQDKhoanVay ?? 0,
+                dtTraThangQD: (dtCaNhan?.dtTraThangQD ?? 0) > 0 ? (dtCaNhan?.dtTraThangQD ?? 0) : (dtCaNhan?.doanhThuThuc ?? 0),
+                cacMonGiao: cacMonGiao,
+                doanhThuCaNhan: dtCaNhan
+            )
+        }
+
+        switch sapXep {
+        case .soMonHoanThanh:
+            ketQua.sort {
+                if $0.soMonDat != $1.soMonDat { return $0.soMonDat > $1.soMonDat }
+                if abs($0.phanTramHTTB - $1.phanTramHTTB) > 0.001 { return $0.phanTramHTTB > $1.phanTramHTTB }
+                return $0.doanhThuQD > $1.doanhThuQD
+            }
+        case .doanhThuQD:
+            ketQua.sort {
+                if abs($0.doanhThuQD - $1.doanhThuQD) > 0.001 { return $0.doanhThuQD > $1.doanhThuQD }
+                return $0.soMonDat > $1.soMonDat
+            }
+        case .phanTramTB:
+            ketQua.sort {
+                if abs($0.phanTramHTTB - $1.phanTramHTTB) > 0.001 { return $0.phanTramHTTB > $1.phanTramHTTB }
+                return $0.soMonDat > $1.soMonDat
+            }
+        }
+        return ketQua
+    }
+
+    /// Gộp kết quả quét thực hiện nhân viên theo ngành hàng vào dữ liệu ngày
+    func gopKetQuaThiDuaNhanVien(
+        hienTai: [String: [String: Double]],
+        mangKhoiNV: [KetQuaThiDuaNhanVienKhoi],
+        ngay: Date,
+        khoaNganhMacDinh: String? = nil
+    ) -> [String: [String: Double]] {
+        var ketQua = hienTai
+        let matHangThang = danhSachMatHangThang(den: ngay)
+
+        for khoi in mangKhoiNV {
+            let tenLoc = Self.apDungLocTuCaiDat(khoi.tenNganhHang)
+            var khoaNganh = Self.chuanHoaKhoaSoSanh(tenLoc)
+
+            if !khoaNganh.isEmpty {
+                if let khop = matHangThang.first(where: {
+                    let k = Self.chuanHoaKhoaSoSanh($0.tenNganhHang)
+                    return k == khoaNganh || k.contains(khoaNganh) || khoaNganh.contains(k)
+                }) {
+                    khoaNganh = Self.chuanHoaKhoaSoSanh(khop.tenNganhHang)
+                }
+            }
+            if (khoaNganh.isEmpty || khoaNganh == "NGANH HANG"), let macDinh = khoaNganhMacDinh, !macDinh.isEmpty {
+                khoaNganh = macDinh
+            }
+            guard !khoaNganh.isEmpty else { continue }
+
+            var bangCu = ketQua[khoaNganh] ?? [:]
+            for item in khoi.danhSach {
+                let nvKhop = Self.khopNhanVienQuetVoiQuanLy(
+                    maQuet: item.maNV,
+                    tenQuet: item.hoTen,
+                    dsQuanLy: caiDat.danhSachNhanVien
+                )
+                let maLuu = nvKhop?.maNV ?? Self.chuanHoaMaNV(item.maNV)
+                guard !maLuu.isEmpty else { continue }
+                if item.thucHien >= 0 {
+                    bangCu[maLuu] = item.thucHien
+                }
+            }
+            ketQua[khoaNganh] = bangCu
+        }
+        return ketQua
     }
 
     /// Chỉ lọc bỏ đúng các cụm từ do người dùng thêm vào trong Cài đặt
@@ -439,8 +947,52 @@ final class KhoDuLieu {
     static func chuanHoaKhoaSoSanh(_ ten: String) -> String {
         ten.trimmingCharacters(in: .whitespacesAndNewlines)
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "D")
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .uppercased()
+    }
+
+    static func chuanHoaMaNV(_ raw: String) -> String {
+        if let range = raw.range(of: "\\d{3,10}", options: .regularExpression) {
+            return String(raw[range])
+        }
+        return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func khopNhanVienQuetVoiQuanLy(
+        maQuet: String,
+        tenQuet: String,
+        dsQuanLy: [NhanVienQuanLy]
+    ) -> NhanVienQuanLy? {
+        let maSach = chuanHoaMaNV(maQuet.isEmpty ? tenQuet : maQuet)
+        if !maSach.isEmpty {
+            if let theoMa = dsQuanLy.first(where: { $0.maNV == maSach }) {
+                return theoMa
+            }
+        }
+        let tenKhongSo = tenQuet
+            .replacingOccurrences(of: "\\d+", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "[-–—]", with: " ", options: .regularExpression)
+        let tenChuan = chuanHoaKhoaSoSanh(tenKhongSo)
+        guard !tenChuan.isEmpty else { return nil }
+
+        for nv in dsQuanLy {
+            let nvChuan = chuanHoaKhoaSoSanh(nv.hoTen)
+            if nvChuan == tenChuan || nvChuan.hasSuffix(tenChuan) || tenChuan.hasSuffix(nvChuan) || nvChuan.contains(tenChuan) {
+                return nv
+            }
+        }
+        return nil
+    }
+
+    static func huyChuongHang(_ hang: Int) -> String {
+        switch hang {
+        case 1: return "🥇"
+        case 2: return "🥈"
+        case 3: return "🥉"
+        default: return "\(hang)"
+        }
     }
 }
 
@@ -508,6 +1060,13 @@ extension Double {
 
     var chuoiSoNguyenVN: String {
         Double.boDinhDangNguyenVN.string(from: NSNumber(value: self.rounded())) ?? String(format: "%.0f", self)
+    }
+
+    var chuoiSoGonVN: String {
+        if abs(self.rounded() - self) < 0.005 {
+            return chuoiSoNguyenVN
+        }
+        return chuoiSoVN
     }
 
     var chuoiPhanTramVN: String {
