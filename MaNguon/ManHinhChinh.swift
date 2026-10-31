@@ -3,13 +3,14 @@ import PhotosUI
 
 final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     private enum CheDoQuetAnh {
-        case doanhThu
+        case doanhThu(LoaiCheDoDoanhThu)
         case thiDua
         case doanhThuNhanVien
     }
 
     private var ngayHienTai = TienIchNgay.lich.startOfDay(for: Date())
     private var tabHienTai: LoaiTabMuc = .thiDua
+    private var cheDoDoanhThu: LoaiCheDoDoanhThu = .luyKe
     private var cheDoQuet: CheDoQuetAnh = .thiDua
 
     private let nutNgay = UIButton(type: .system)
@@ -120,8 +121,16 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     // MARK: - Dựng giao diện chính
 
     private func taoGiaoDien() {
-        // 1. Cụm Tiến độ tháng & 8 thẻ Chỉ số chính (Doanh thu)
+        // 1. Cụm Tiến độ tháng & 8 thẻ Chỉ số chính (Doanh thu: Lũy kế & Realtime)
         cumChiSoChinh.addTarget(self, action: #selector(bamTheDoanhThu), for: .touchUpInside)
+        cumChiSoChinh.khiBamVungThe = { [weak self] in
+            self?.bamTheDoanhThu()
+        }
+        cumChiSoChinh.khiDoiCheDoDoanhThu = { [weak self] cheDoMoi in
+            guard let self = self else { return }
+            self.cheDoDoanhThu = cheDoMoi
+            self.napDuLieu()
+        }
 
         // 2. Cụm 4 nút phía dưới cụm Doanh thu (Thi đua | Nhân viên | Dự phòng 2 | Dự phòng 3)
         cacNutMuc = LoaiTabMuc.allCases.map { loai in
@@ -228,7 +237,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             cumChiSoChinh.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
             cumChiSoChinh.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
             cumChiSoChinh.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            cumChiSoChinh.heightAnchor.constraint(equalToConstant: 154),
+            cumChiSoChinh.heightAnchor.constraint(equalToConstant: 158),
 
             hangBonNut.topAnchor.constraint(equalTo: cumChiSoChinh.bottomAnchor, constant: 8),
             hangBonNut.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
@@ -343,11 +352,13 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
 
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
         let soDat = dl.danhSachThiDua.filter { $0.daDat }.count
+        let dtDangChon = (cheDoDoanhThu == .luyKe) ? dl.doanhThu : dl.doanhThuRealtime
         cumChiSoChinh.capNhat(
-            doanhThu: dl.doanhThu,
+            doanhThu: dtDangChon,
             soNganhDat: soDat,
             tongSoNganh: dl.danhSachThiDua.count,
-            ngay: ngayHienTai
+            ngay: ngayHienTai,
+            cheDo: cheDoDoanhThu
         )
         bangThiDua.ganDanhSach(dl.danhSachThiDua)
         bangNhanVien.capNhat(cho: ngayHienTai)
@@ -484,24 +495,52 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         present(menu, animated: true)
     }
 
-    // MARK: - Tương tác cụm Doanh thu (Quét 1 hoặc 2 ảnh hoặc nhập trực tiếp)
+    // MARK: - Tương tác cụm Doanh thu (Lũy kế & Realtime — bắt buộc chọn đủ 2 ảnh DT thực & DT quy đổi kèm hướng dẫn)
 
     @objc private func bamTheDoanhThu() {
+        let tenCheDo = cheDoDoanhThu.tieuDe
         let menu = UIAlertController(
-            title: "Chỉ số chính — Doanh thu Thực & Quy đổi",
-            message: "Chọn 1 hoặc 2 ảnh chụp màn hình 'Doanh thu hợp nhất' (DT thực & DT quy đổi) để đọc tự động, hoặc nhập trực tiếp:",
+            title: "Doanh thu \(tenCheDo) — Thực & Quy đổi",
+            message: "Đang xem mục: \(tenCheDo.uppercased()).
+Khi quét ảnh, vui lòng chọn cùng lúc đủ 2 ảnh chụp màn hình (1 ảnh DT thực + 1 ảnh DT quy đổi) của phần \(tenCheDo).",
             preferredStyle: .actionSheet
         )
-        menu.addAction(UIAlertAction(title: "📷 Chọn ảnh chụp màn hình Doanh thu (1-2 ảnh)", style: .default) { [weak self] _ in
-            self?.moChonAnh(cheDo: .doanhThu, gioiHan: 0)
+        menu.addAction(UIAlertAction(title: "📷 Nhập 2 ảnh Doanh thu \(tenCheDo) (Thực + QĐ)", style: .default) { [weak self] _ in
+            guard let self = self else { return }
+            self.moHuongDanQuet2AnhDoanhThu(cheDo: self.cheDoDoanhThu)
         })
-        menu.addAction(UIAlertAction(title: "✏️ Nhập / Sửa tay số liệu Doanh thu", style: .default) { [weak self] _ in
+        menu.addAction(UIAlertAction(title: "✏️ Nhập / Sửa tay Doanh thu \(tenCheDo)", style: .default) { [weak self] _ in
             self?.moHopThoaiNhapDoanhThu()
         })
-        menu.addAction(UIAlertAction(title: "🗑️ Xoá số liệu Doanh thu", style: .destructive) { [weak self] _ in
+        menu.addAction(UIAlertAction(title: "🗑️ Xoá số liệu Doanh thu \(tenCheDo)", style: .destructive) { [weak self] _ in
             guard let self = self else { return }
             var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
-            dl.doanhThu = ThongTinDoanhThu()
+            if self.cheDoDoanhThu == .luyKe {
+                dl.doanhThuRealtime = ThongTinDoanhThu(
+            doanhThuThuc: 385.50,
+            targetThuc: 420.00,
+            duKienThuc: 410.00,
+            phanTramHTThuc: 91.8,
+            doanhThuQuyDoi: 542.80,
+            targetQuyDoi: 560.00,
+            duKienQuyDoi: 575.00,
+            phanTramHTQuyDoi: 96.9,
+            phanTramTraGop: 44.2,
+            doanhThuTraGop: 239.90,
+            luotKhach: 645,
+            soBill: 78,
+            phanTramPVTC: 12.1,
+            tangGiamCungKy: 8.4,
+            coTangGiam: true,
+            tb3Thang: 355.6,
+            soNgayDaQua: 29,
+            tongSoNgay: 31,
+            phanTramTienDoThang: 94.0
+        )
+        dl.doanhThu = ThongTinDoanhThu()
+            } else {
+                dl.doanhThuRealtime = ThongTinDoanhThu()
+            }
             KhoDuLieu.dungChung.luu(dl)
             self.napDuLieu()
         })
@@ -514,13 +553,33 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         present(menu, animated: true)
     }
 
+    private func moHuongDanQuet2AnhDoanhThu(cheDo: LoaiCheDoDoanhThu) {
+        let tenCheDo = cheDo.tieuDe
+        let hd = UIAlertController(
+            title: "Hướng dẫn nhập ảnh Doanh thu (\(tenCheDo))",
+            message: "Bắt buộc chọn đủ 2 ảnh trong 1 lần:
+
+1️⃣ Ảnh 1: Chụp màn hình Doanh thu THỰC (\(tenCheDo))
+2️⃣ Ảnh 2: Chụp màn hình Doanh thu QUY ĐỔI (\(tenCheDo))
+
+Hệ thống sẽ tự động phân tích và gộp đủ Doanh thu thực, Doanh thu quy đổi cùng toàn bộ chỉ số phụ.",
+            preferredStyle: .alert
+        )
+        hd.addAction(UIAlertAction(title: "Chọn đủ 2 ảnh ngay", style: .default) { [weak self] _ in
+            self?.moChonAnh(cheDo: .doanhThu(cheDo), gioiHan: 2)
+        })
+        hd.addAction(UIAlertAction(title: "Huỷ", style: .cancel))
+        present(hd, animated: true)
+    }
+
     private func moHopThoaiNhapDoanhThu() {
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
-        let dt = dl.doanhThu
+        let dt = (cheDoDoanhThu == .luyKe) ? dl.doanhThu : dl.doanhThuRealtime
+        let tenCheDo = cheDoDoanhThu.tieuDe
 
         let hop = UIAlertController(
-            title: "Số liệu Doanh thu",
-            message: "Nhập Doanh thu thực, Target thực, Doanh thu QĐ và Target QĐ:",
+            title: "Số liệu Doanh thu (\(tenCheDo))",
+            message: "Nhập Doanh thu thực, Target thực, Doanh thu QĐ và Target QĐ cho phần \(tenCheDo):",
             preferredStyle: .alert
         )
         hop.addTextField { tf in
@@ -553,7 +612,11 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
                 doanhThuQuyDoi: self.docSoTuO(tfs[2].text),
                 targetQuyDoi: self.docSoTuO(tfs[3].text)
             )
-            moi.doanhThu = moi.doanhThu.gop(voi: nhap)
+            if self.cheDoDoanhThu == .luyKe {
+                moi.doanhThu = moi.doanhThu.gop(voi: nhap)
+            } else {
+                moi.doanhThuRealtime = moi.doanhThuRealtime.gop(voi: nhap)
+            }
             KhoDuLieu.dungChung.luu(moi)
             self.napDuLieu()
         })
@@ -606,8 +669,8 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             guard !cacAnh.isEmpty else { return }
 
             switch cheDo {
-            case .doanhThu:
-                self.xuLyQuetDoanhThu(cacAnh)
+            case .doanhThu(let loaiDT):
+                self.xuLyQuetDoanhThu(cacAnh, loai: loaiDT)
             case .thiDua:
                 self.xuLyQuetThiDua(cacAnh)
             case .doanhThuNhanVien:
@@ -690,8 +753,25 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         )
     }
 
-    private func xuLyQuetDoanhThu(_ cacAnh: [UIImage]) {
-        hienTienTrinh("Đang đọc \(cacAnh.count) ảnh Doanh thu...")
+    private func xuLyQuetDoanhThu(_ cacAnh: [UIImage], loai: LoaiCheDoDoanhThu) {
+        let tenCheDo = loai.tieuDe
+        guard cacAnh.count == 2 else {
+            let tb = UIAlertController(
+                title: "Cần chọn đủ 2 ảnh Doanh thu (\(tenCheDo))",
+                message: "Bạn vừa chọn \(cacAnh.count) ảnh. Bắt buộc chọn đủ 2 ảnh trong 1 lần:
+• 1 ảnh chứa Doanh thu THỰC
+• 1 ảnh chứa Doanh thu QUY ĐỔI",
+                preferredStyle: .alert
+            )
+            tb.addAction(UIAlertAction(title: "Chọn lại 2 ảnh", style: .default) { [weak self] _ in
+                self?.moChonAnh(cheDo: .doanhThu(loai), gioiHan: 2)
+            })
+            tb.addAction(UIAlertAction(title: "Đóng", style: .cancel))
+            present(tb, animated: true)
+            return
+        }
+
+        hienTienTrinh("Đang đọc 2 ảnh Doanh thu (\(tenCheDo))...")
         DichVuDocAnh.dungChung.quetAnhDoanhThu(
             danhSachAnh: cacAnh,
             tienTrinh: { [weak self] tt in
@@ -700,13 +780,43 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             hoanTat: { [weak self] dtMoi in
                 guard let self = self else { return }
                 self.anTienTrinh()
+
+                if dtMoi.doanhThuThuc <= 0 || dtMoi.doanhThuQuyDoi <= 0 {
+                    let thieu = (dtMoi.doanhThuThuc <= 0 && dtMoi.doanhThuQuyDoi <= 0)
+                        ? "cả Doanh thu thực và Doanh thu quy đổi"
+                        : (dtMoi.doanhThuThuc <= 0 ? "ảnh Doanh thu THỰC" : "ảnh Doanh thu QUY ĐỔI")
+                    let tb = UIAlertController(
+                        title: "Chưa đủ cả 2 loại ảnh Doanh thu",
+                        message: "Hệ thống phát hiện thiếu \(thieu). Vui lòng chọn đúng 1 ảnh Doanh thu thực và 1 ảnh Doanh thu quy đổi của phần \(tenCheDo).",
+                        preferredStyle: .alert
+                    )
+                    tb.addAction(UIAlertAction(title: "Chọn lại 2 ảnh", style: .default) { [weak self] _ in
+                        self?.moChonAnh(cheDo: .doanhThu(loai), gioiHan: 2)
+                    })
+                    tb.addAction(UIAlertAction(title: "Vẫn lưu kết quả vừa đọc", style: .default) { [weak self] _ in
+                        guard let self = self else { return }
+                        var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
+                        if loai == .luyKe {
+                            dl.doanhThu = dl.doanhThu.gop(voi: dtMoi)
+                        } else {
+                            dl.doanhThuRealtime = dl.doanhThuRealtime.gop(voi: dtMoi)
+                        }
+                        KhoDuLieu.dungChung.luu(dl)
+                        self.napDuLieu()
+                    })
+                    tb.addAction(UIAlertAction(title: "Huỷ", style: .cancel))
+                    self.present(tb, animated: true)
+                    return
+                }
+
                 var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
-                dl.doanhThu = dl.doanhThu.gop(voi: dtMoi)
+                if loai == .luyKe {
+                    dl.doanhThu = dl.doanhThu.gop(voi: dtMoi)
+                } else {
+                    dl.doanhThuRealtime = dl.doanhThuRealtime.gop(voi: dtMoi)
+                }
                 KhoDuLieu.dungChung.luu(dl)
                 self.napDuLieu()
-                if !dl.doanhThu.coDuLieu {
-                    self.moHopThoaiNhapDoanhThu()
-                }
             }
         )
     }
@@ -885,17 +995,18 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
 
     @objc private func moMenuXuatBaoCao() {
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
-        guard !dl.danhSachThiDua.isEmpty || dl.doanhThu.coDuLieu else { return }
+        let dtDangChon = (cheDoDoanhThu == .luyKe) ? dl.doanhThu : dl.doanhThuRealtime
+        guard !dl.danhSachThiDua.isEmpty || dtDangChon.coDuLieu || dl.doanhThu.coDuLieu else { return }
 
         let kieu = KhoDuLieu.dungChung.caiDat.kieuHienThi
         let moTaKieu = (kieu == .bangChiTiet) ? "Mẫu Bảng 8 cột" : "Mẫu Thẻ \(KhoDuLieu.dungChung.caiDat.soCotXuatAnh) cột"
 
-        let menu = UIAlertController(title: "Xuất báo cáo tổng hợp", message: nil, preferredStyle: .actionSheet)
+        let menu = UIAlertController(title: "Xuất báo cáo tổng hợp (\(cheDoDoanhThu.tieuDe))", message: nil, preferredStyle: .actionSheet)
         menu.addAction(UIAlertAction(title: "🖼️ Xuất Ảnh báo cáo (\(moTaKieu))", style: .default) { [weak self] _ in
             guard let self = self,
                   let anh = self.bangThiDua.taoAnhBaoCao(
                       ngay: self.ngayHienTai,
-                      doanhThu: dl.doanhThu,
+                      doanhThu: dtDangChon,
                       thongTinDonVi: dl.thongTinDonVi,
                       capNhatLuc: dl.capNhatLuc
                   ) else { return }
@@ -903,7 +1014,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         })
         menu.addAction(UIAlertAction(title: "📊 Xuất file Excel (.csv)", style: .default) { [weak self] _ in
             guard let self = self else { return }
-            let csv = self.bangThiDua.taoChuoiExcelCSV(doanhThu: dl.doanhThu)
+            let csv = self.bangThiDua.taoChuoiExcelCSV(doanhThu: dtDangChon)
             let tenTep = "TongHopDMX-\(dl.khoaNgay).csv"
             let duongDan = FileManager.default.temporaryDirectory.appendingPathComponent(tenTep)
             try? csv.write(to: duongDan, atomically: true, encoding: .utf8)

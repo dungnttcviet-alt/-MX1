@@ -87,15 +87,16 @@ final class TheDoanhThuView: UIControl {
             addSubview($0)
         }
 
+        let trailingTieuDe: CGFloat = hienChamTron ? -13 : -4
         NSLayoutConstraint.activate([
             nhanTieuDe.topAnchor.constraint(equalTo: topAnchor, constant: 6),
             nhanTieuDe.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            nhanTieuDe.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            nhanTieuDe.trailingAnchor.constraint(equalTo: trailingAnchor, constant: trailingTieuDe),
 
             chamTron.centerYAnchor.constraint(equalTo: nhanTieuDe.centerYAnchor),
-            chamTron.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            chamTron.widthAnchor.constraint(equalToConstant: 7),
-            chamTron.heightAnchor.constraint(equalToConstant: 7),
+            chamTron.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
+            chamTron.widthAnchor.constraint(equalToConstant: 6),
+            chamTron.heightAnchor.constraint(equalToConstant: 6),
 
             nhanGiaTriChinh.topAnchor.constraint(equalTo: nhanTieuDe.bottomAnchor, constant: 3),
             nhanGiaTriChinh.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
@@ -147,7 +148,13 @@ final class TheDoanhThuView: UIControl {
 }
 
 final class CumChiSoChinhView: UIControl {
+    var khiDoiCheDoDoanhThu: ((LoaiCheDoDoanhThu) -> Void)?
+    var khiBamVungThe: (() -> Void)?
+
+    private var cheDoDoanhThu: LoaiCheDoDoanhThu = .luyKe
     private let khungTienDo = UIView()
+    private let nutLuyKe = UIButton(type: .custom)
+    private let nutRealtime = UIButton(type: .custom)
     private let nhanTienDoTrai = UILabel()
     private let nhanTienDoPhai = UILabel()
     private let nenThanhTienDo = UIView()
@@ -215,10 +222,33 @@ final class CumChiSoChinhView: UIControl {
         khungTienDo.layer.cornerRadius = 10
         khungTienDo.layer.borderWidth = 1
         khungTienDo.layer.borderColor = UIColor.systemGray5.cgColor
-        khungTienDo.isUserInteractionEnabled = false
+        khungTienDo.isUserInteractionEnabled = true
 
-        nhanTienDoTrai.font = .systemFont(ofSize: coLon ? 12 : 11, weight: .bold)
-        nhanTienDoTrai.textColor = .label
+        nutLuyKe.tag = LoaiCheDoDoanhThu.luyKe.rawValue
+        nutLuyKe.setTitle("Lũy kế", for: .normal)
+        nutLuyKe.titleLabel?.font = .systemFont(ofSize: coLon ? 11.5 : 10.5, weight: .bold)
+        nutLuyKe.layer.cornerRadius = 6
+        nutLuyKe.addTarget(self, action: #selector(bamChonCheDo(_:)), for: .touchUpInside)
+
+        nutRealtime.tag = LoaiCheDoDoanhThu.realtime.rawValue
+        nutRealtime.setTitle("Realtime", for: .normal)
+        nutRealtime.titleLabel?.font = .systemFont(ofSize: coLon ? 11.5 : 10.5, weight: .bold)
+        nutRealtime.layer.cornerRadius = 6
+        nutRealtime.addTarget(self, action: #selector(bamChonCheDo(_:)), for: .touchUpInside)
+
+        let khungHaiNut = UIStackView(arrangedSubviews: [nutLuyKe, nutRealtime])
+        khungHaiNut.axis = .horizontal
+        khungHaiNut.spacing = 4
+        khungHaiNut.distribution = .fillEqually
+        khungHaiNut.backgroundColor = .systemGray6
+        khungHaiNut.layer.cornerRadius = 7
+        khungHaiNut.isLayoutMarginsRelativeArrangement = true
+        khungHaiNut.layoutMargins = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
+
+        nhanTienDoTrai.font = .systemFont(ofSize: coLon ? 11.5 : 10.5, weight: .bold)
+        nhanTienDoTrai.textColor = .secondaryLabel
+        nhanTienDoTrai.adjustsFontSizeToFitWidth = true
+        nhanTienDoTrai.minimumScaleFactor = 0.75
 
         nhanTienDoPhai.font = .systemFont(ofSize: coLon ? 12 : 11, weight: .bold)
         nhanTienDoPhai.textColor = .label
@@ -227,13 +257,14 @@ final class CumChiSoChinhView: UIControl {
         nenThanhTienDo.backgroundColor = .systemGray5
         nenThanhTienDo.layer.cornerRadius = 2.5
         nenThanhTienDo.clipsToBounds = true
+        nenThanhTienDo.isUserInteractionEnabled = false
 
         mauThanhTienDo.backgroundColor = .systemBlue
         mauThanhTienDo.layer.cornerRadius = 2.5
         mauThanhTienDo.translatesAutoresizingMaskIntoConstraints = false
         nenThanhTienDo.addSubview(mauThanhTienDo)
 
-        [nhanTienDoTrai, nhanTienDoPhai, nenThanhTienDo].forEach {
+        [khungHaiNut, nhanTienDoTrai, nhanTienDoPhai, nenThanhTienDo].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             khungTienDo.addSubview($0)
         }
@@ -242,17 +273,23 @@ final class CumChiSoChinhView: UIControl {
         rangBuocRongTienDo = rangBuocRong
 
         NSLayoutConstraint.activate([
-            nhanTienDoTrai.topAnchor.constraint(equalTo: khungTienDo.topAnchor, constant: 6),
-            nhanTienDoTrai.leadingAnchor.constraint(equalTo: khungTienDo.leadingAnchor, constant: 10),
+            khungHaiNut.topAnchor.constraint(equalTo: khungTienDo.topAnchor, constant: 4),
+            khungHaiNut.leadingAnchor.constraint(equalTo: khungTienDo.leadingAnchor, constant: 8),
+            khungHaiNut.widthAnchor.constraint(equalToConstant: coLon ? 148 : 132),
+            khungHaiNut.heightAnchor.constraint(equalToConstant: coLon ? 22 : 20),
 
-            nhanTienDoPhai.centerYAnchor.constraint(equalTo: nhanTienDoTrai.centerYAnchor),
+            nhanTienDoTrai.centerYAnchor.constraint(equalTo: khungHaiNut.centerYAnchor),
+            nhanTienDoTrai.leadingAnchor.constraint(equalTo: khungHaiNut.trailingAnchor, constant: 8),
+            nhanTienDoTrai.trailingAnchor.constraint(lessThanOrEqualTo: nhanTienDoPhai.leadingAnchor, constant: -6),
+
+            nhanTienDoPhai.centerYAnchor.constraint(equalTo: khungHaiNut.centerYAnchor),
             nhanTienDoPhai.trailingAnchor.constraint(equalTo: khungTienDo.trailingAnchor, constant: -10),
 
-            nenThanhTienDo.topAnchor.constraint(equalTo: nhanTienDoTrai.bottomAnchor, constant: 5),
+            nenThanhTienDo.topAnchor.constraint(equalTo: khungHaiNut.bottomAnchor, constant: 4),
             nenThanhTienDo.leadingAnchor.constraint(equalTo: khungTienDo.leadingAnchor, constant: 10),
             nenThanhTienDo.trailingAnchor.constraint(equalTo: khungTienDo.trailingAnchor, constant: -10),
-            nenThanhTienDo.heightAnchor.constraint(equalToConstant: 5),
-            nenThanhTienDo.bottomAnchor.constraint(lessThanOrEqualTo: khungTienDo.bottomAnchor, constant: -6),
+            nenThanhTienDo.heightAnchor.constraint(equalToConstant: 4.5),
+            nenThanhTienDo.bottomAnchor.constraint(lessThanOrEqualTo: khungTienDo.bottomAnchor, constant: -4),
 
             mauThanhTienDo.leadingAnchor.constraint(equalTo: nenThanhTienDo.leadingAnchor),
             mauThanhTienDo.topAnchor.constraint(equalTo: nenThanhTienDo.topAnchor),
@@ -280,22 +317,54 @@ final class CumChiSoChinhView: UIControl {
         luoiThe.axis = .vertical
         luoiThe.spacing = khoangCach
         luoiThe.distribution = .fillEqually
-        luoiThe.isUserInteractionEnabled = false
+        luoiThe.isUserInteractionEnabled = true
+
+        let tapLuoiThe = UITapGestureRecognizer(target: self, action: #selector(bamVaoLuoiThe))
+        luoiThe.addGestureRecognizer(tapLuoiThe)
 
         let nganChinh = UIStackView(arrangedSubviews: [khungTienDo, luoiThe])
         nganChinh.axis = .vertical
         nganChinh.spacing = coLon ? 8 : 5
-        nganChinh.isUserInteractionEnabled = false
+        nganChinh.isUserInteractionEnabled = true
         nganChinh.translatesAutoresizingMaskIntoConstraints = false
         addSubview(nganChinh)
 
         NSLayoutConstraint.activate([
-            khungTienDo.heightAnchor.constraint(equalToConstant: coLon ? 36 : 32),
+            khungTienDo.heightAnchor.constraint(equalToConstant: coLon ? 38 : 35),
             nganChinh.topAnchor.constraint(equalTo: topAnchor),
             nganChinh.leadingAnchor.constraint(equalTo: leadingAnchor),
             nganChinh.trailingAnchor.constraint(equalTo: trailingAnchor),
             nganChinh.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+
+        capNhatMauNutCheDo()
+    }
+
+    @objc private func bamChonCheDo(_ sender: UIButton) {
+        guard let moi = LoaiCheDoDoanhThu(rawValue: sender.tag), moi != cheDoDoanhThu else { return }
+        cheDoDoanhThu = moi
+        capNhatMauNutCheDo()
+        khiDoiCheDoDoanhThu?(moi)
+    }
+
+    @objc private func bamVaoLuoiThe() {
+        if let khiBamVungThe {
+            khiBamVungThe()
+        } else {
+            sendActions(for: .touchUpInside)
+        }
+    }
+
+    private func capNhatMauNutCheDo() {
+        for (nut, loai) in [(nutLuyKe, LoaiCheDoDoanhThu.luyKe), (nutRealtime, LoaiCheDoDoanhThu.realtime)] {
+            if cheDoDoanhThu == loai {
+                nut.backgroundColor = .systemBlue
+                nut.setTitleColor(.white, for: .normal)
+            } else {
+                nut.backgroundColor = .clear
+                nut.setTitleColor(.secondaryLabel, for: .normal)
+            }
+        }
     }
 
     override func layoutSubviews() {
@@ -304,13 +373,16 @@ final class CumChiSoChinhView: UIControl {
         rangBuocRongTienDo?.constant = nenThanhTienDo.bounds.width * tyLeTienDo
     }
 
-    func capNhat(doanhThu dt: ThongTinDoanhThu, soNganhDat: Int, tongSoNganh: Int, ngay: Date = Date()) {
+    func capNhat(doanhThu dt: ThongTinDoanhThu, soNganhDat: Int, tongSoNganh: Int, ngay: Date = Date(), cheDo: LoaiCheDoDoanhThu = .luyKe) {
+        self.cheDoDoanhThu = cheDo
+        capNhatMauNutCheDo()
+
         let lich = TienIchNgay.lich
         let ngayMĐ = dt.soNgayDaQua > 0 ? dt.soNgayDaQua : max(1, lich.component(.day, from: ngay))
         let tongNgayMĐ = dt.tongSoNgay > 0 ? dt.tongSoNgay : (lich.range(of: .day, in: .month, for: ngay)?.count ?? 30)
         let ptTienDo = dt.phanTramTienDoThang > 0 ? dt.phanTramTienDoThang : (Double(ngayMĐ) / Double(max(1, tongNgayMĐ)) * 100.0)
 
-        nhanTienDoTrai.text = "Tiến độ tháng   Ngày \(ngayMĐ) / \(tongNgayMĐ)"
+        nhanTienDoTrai.text = "Ngày \(ngayMĐ)/\(tongNgayMĐ)"
         nhanTienDoPhai.text = ptTienDo.chuoiPhanTram
         tyLeTienDo = CGFloat(min(1.0, max(0.02, ptTienDo / 100.0)))
 
@@ -604,39 +676,38 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
 
         chonBoLoc.selectedSegmentIndex = 0
         chonBoLoc.apportionsSegmentWidthsByContent = true
-        chonBoLoc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 11.5, weight: .semibold)], for: .normal)
-        chonBoLoc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 11.5, weight: .bold)], for: .selected)
+        chonBoLoc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 10.5, weight: .semibold)], for: .normal)
+        chonBoLoc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 10.5, weight: .bold)], for: .selected)
         chonBoLoc.addTarget(self, action: #selector(doiBoLoc), for: .valueChanged)
 
-        nutSapXep.setTitle(" ⇅ \(kieuSapXep.nhanNgan)", for: .normal)
-        nutSapXep.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
+        nutSapXep.setTitle("⇅ \(kieuSapXep.nhanNgan)", for: .normal)
+        nutSapXep.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
         nutSapXep.backgroundColor = .secondarySystemGroupedBackground
         nutSapXep.tintColor = .systemBlue
         nutSapXep.layer.cornerRadius = 8
         nutSapXep.layer.borderWidth = 1
         nutSapXep.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.25).cgColor
-        nutSapXep.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        nutSapXep.contentEdgeInsets = UIEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
         cauHinhMenuSapXep()
 
-        nutSoCot.setTitle(" 1 cột", for: .normal)
+        nutSoCot.setTitle(" 1c", for: .normal)
         nutSoCot.setImage(UIImage(systemName: "rectangle.grid.1x2"), for: .normal)
-        nutSoCot.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        nutSoCot.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
         nutSoCot.backgroundColor = .secondarySystemGroupedBackground
         nutSoCot.tintColor = .systemBlue
         nutSoCot.layer.cornerRadius = 8
-        nutSoCot.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        nutSoCot.contentEdgeInsets = UIEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
         nutSoCot.addTarget(self, action: #selector(doiSoCot), for: .touchUpInside)
 
         let thanhDieuKhien = UIStackView(arrangedSubviews: [chonBoLoc, nutSapXep, nutSoCot])
         thanhDieuKhien.axis = .horizontal
-        thanhDieuKhien.spacing = 6
+        thanhDieuKhien.spacing = 4
         chonBoLoc.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        chonBoLoc.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        chonBoLoc.setContentCompressionResistancePriority(.required, for: .horizontal)
         nutSapXep.setContentHuggingPriority(.required, for: .horizontal)
-        nutSapXep.setContentCompressionResistancePriority(.required, for: .horizontal)
+        nutSapXep.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
         nutSoCot.setContentHuggingPriority(.required, for: .horizontal)
-        nutSoCot.setContentCompressionResistancePriority(.required, for: .horizontal)
-        nutSapXep.widthAnchor.constraint(greaterThanOrEqualToConstant: 86).isActive = true
+        nutSoCot.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         // Khởi tạo Mẫu 1 (Bảng 8 cột)
         cuonNgang.showsHorizontalScrollIndicator = true
@@ -738,7 +809,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
             ) { [weak self] _ in
                 guard let self = self else { return }
                 self.kieuSapXep = kieu
-                self.nutSapXep.setTitle(" ⇅ \(kieu.nhanNgan)", for: .normal)
+                self.nutSapXep.setTitle("⇅ \(kieu.nhanNgan)", for: .normal)
                 self.cauHinhMenuSapXep()
                 self.capNhatDanhSach()
             }
@@ -759,7 +830,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
 
         chonBoLoc.setTitle("Tất cả (\(tong))", forSegmentAt: 0)
         chonBoLoc.setTitle("Đạt (\(soDat))", forSegmentAt: 1)
-        chonBoLoc.setTitle("Chưa (\(soChuaDat))", forSegmentAt: 2)
+        chonBoLoc.setTitle("Chưa đạt (\(soChuaDat))", forSegmentAt: 2)
 
         var tam = danhSachGoc
         switch boLoc {
@@ -807,7 +878,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
     @objc private func doiSoCot() {
         soCotTrenDienThoai = (soCotTrenDienThoai == 1) ? 2 : 1
         let icon = (soCotTrenDienThoai == 1) ? "rectangle.grid.1x2" : "square.grid.2x2"
-        nutSoCot.setTitle(" \(soCotTrenDienThoai) cột", for: .normal)
+        nutSoCot.setTitle(" \(soCotTrenDienThoai)c", for: .normal)
         nutSoCot.setImage(UIImage(systemName: icon), for: .normal)
         luoi.collectionViewLayout.invalidateLayout()
         luoi.reloadData()

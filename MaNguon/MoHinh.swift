@@ -1,5 +1,17 @@
 import UIKit
 
+enum LoaiCheDoDoanhThu: Int, CaseIterable {
+    case luyKe = 0
+    case realtime = 1
+
+    var tieuDe: String {
+        switch self {
+        case .luyKe: return "Lũy kế"
+        case .realtime: return "Realtime"
+        }
+    }
+}
+
 enum LoaiTabMuc: Int, CaseIterable {
     case thiDua = 0
     case nhanVien = 1
@@ -537,6 +549,7 @@ struct DuLieuNgayDMX: Codable {
     var capNhatLuc: String
     var thongTinDonVi: String
     var doanhThu: ThongTinDoanhThu
+    var doanhThuRealtime: ThongTinDoanhThu = ThongTinDoanhThu()
     var danhSachThiDua: [DongThiDua]
     var thiDuaNhanVien: [String: [String: Double]] = [:]
     var doanhThuNhanVien: [DoanhThuNhanVienItem] = []
@@ -546,6 +559,7 @@ struct DuLieuNgayDMX: Codable {
         capNhatLuc: String,
         thongTinDonVi: String,
         doanhThu: ThongTinDoanhThu,
+        doanhThuRealtime: ThongTinDoanhThu = ThongTinDoanhThu(),
         danhSachThiDua: [DongThiDua],
         thiDuaNhanVien: [String: [String: Double]] = [:],
         doanhThuNhanVien: [DoanhThuNhanVienItem] = []
@@ -554,6 +568,7 @@ struct DuLieuNgayDMX: Codable {
         self.capNhatLuc = capNhatLuc
         self.thongTinDonVi = thongTinDonVi
         self.doanhThu = doanhThu
+        self.doanhThuRealtime = doanhThuRealtime
         self.danhSachThiDua = danhSachThiDua
         self.thiDuaNhanVien = thiDuaNhanVien
         self.doanhThuNhanVien = doanhThuNhanVien
@@ -565,6 +580,7 @@ struct DuLieuNgayDMX: Codable {
         capNhatLuc = (try? c.decode(String.self, forKey: .capNhatLuc)) ?? ""
         thongTinDonVi = (try? c.decode(String.self, forKey: .thongTinDonVi)) ?? ""
         doanhThu = (try? c.decode(ThongTinDoanhThu.self, forKey: .doanhThu)) ?? ThongTinDoanhThu()
+        doanhThuRealtime = (try? c.decode(ThongTinDoanhThu.self, forKey: .doanhThuRealtime)) ?? ThongTinDoanhThu()
         danhSachThiDua = (try? c.decode([DongThiDua].self, forKey: .danhSachThiDua)) ?? []
         thiDuaNhanVien = (try? c.decode([String: [String: Double]].self, forKey: .thiDuaNhanVien)) ?? [:]
         doanhThuNhanVien = (try? c.decode([DoanhThuNhanVienItem].self, forKey: .doanhThuNhanVien)) ?? []
