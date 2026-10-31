@@ -352,13 +352,18 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         backgroundColor = .clear
 
         chonBoLoc.selectedSegmentIndex = 0
+        chonBoLoc.apportionsSegmentWidthsByContent = true
+        chonBoLoc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 11.5, weight: .semibold)], for: .normal)
+        chonBoLoc.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: 11.5, weight: .bold)], for: .selected)
         chonBoLoc.addTarget(self, action: #selector(doiBoLoc), for: .valueChanged)
 
         nutSapXep.setTitle(" ⇅ \(kieuSapXep.nhanNgan)", for: .normal)
-        nutSapXep.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        nutSapXep.titleLabel?.font = .systemFont(ofSize: 12, weight: .bold)
         nutSapXep.backgroundColor = .secondarySystemGroupedBackground
-        nutSapXep.tintColor = .label
+        nutSapXep.tintColor = .systemBlue
         nutSapXep.layer.cornerRadius = 8
+        nutSapXep.layer.borderWidth = 1
+        nutSapXep.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.25).cgColor
         nutSapXep.contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         cauHinhMenuSapXep()
 
@@ -374,8 +379,13 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         let thanhDieuKhien = UIStackView(arrangedSubviews: [chonBoLoc, nutSapXep, nutSoCot])
         thanhDieuKhien.axis = .horizontal
         thanhDieuKhien.spacing = 6
+        chonBoLoc.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        chonBoLoc.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         nutSapXep.setContentHuggingPriority(.required, for: .horizontal)
+        nutSapXep.setContentCompressionResistancePriority(.required, for: .horizontal)
         nutSoCot.setContentHuggingPriority(.required, for: .horizontal)
+        nutSoCot.setContentCompressionResistancePriority(.required, for: .horizontal)
+        nutSapXep.widthAnchor.constraint(greaterThanOrEqualToConstant: 86).isActive = true
 
         // Khởi tạo Mẫu 1 (Bảng 8 cột)
         cuonNgang.showsHorizontalScrollIndicator = true

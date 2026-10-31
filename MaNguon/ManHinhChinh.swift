@@ -118,27 +118,28 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         hangBonNut.spacing = 6
         hangBonNut.distribution = .fillEqually
 
-        // 3. Thanh nút Quét (Thêm ảnh mới) & Xoá (Quét lại từ đầu) nằm dưới cụm 4 nút
+        // 3. Thanh nút Quét (Thêm ảnh) & Xoá (Quét lại từ đầu) nằm dưới cụm 4 nút
         nutThemAnhMoi.setImage(UIImage(systemName: "camera.viewfinder"), for: .normal)
+        nutThemAnhMoi.setTitle(" Thêm ảnh", for: .normal)
         nutThemAnhMoi.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
         nutThemAnhMoi.backgroundColor = .systemBlue
         nutThemAnhMoi.tintColor = .white
         nutThemAnhMoi.layer.cornerRadius = 10
-        nutThemAnhMoi.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        nutThemAnhMoi.contentEdgeInsets = UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
         nutThemAnhMoi.addTarget(self, action: #selector(bamThemAnhMoi), for: .touchUpInside)
 
-        nutXoaQuetLai.setTitle(" Xoá quét lại", for: .normal)
-        nutXoaQuetLai.setImage(UIImage(systemName: "arrow.counterclockwise.circle.fill"), for: .normal)
-        nutXoaQuetLai.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .semibold)
+        nutXoaQuetLai.setTitle(" Xoá", for: .normal)
+        nutXoaQuetLai.setImage(UIImage(systemName: "trash.fill"), for: .normal)
+        nutXoaQuetLai.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
         nutXoaQuetLai.backgroundColor = UIColor.systemRed.withAlphaComponent(0.12)
         nutXoaQuetLai.tintColor = .systemRed
         nutXoaQuetLai.layer.cornerRadius = 10
-        nutXoaQuetLai.contentEdgeInsets = UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        nutXoaQuetLai.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         nutXoaQuetLai.addTarget(self, action: #selector(bamXoaQuetLai), for: .touchUpInside)
 
         nutThemThuCong.setImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
         nutThemThuCong.setTitle(" Nhập/Mẫu", for: .normal)
-        nutThemThuCong.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        nutThemThuCong.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .semibold)
         nutThemThuCong.backgroundColor = .secondarySystemGroupedBackground
         nutThemThuCong.tintColor = .label
         nutThemThuCong.layer.cornerRadius = 10
@@ -148,8 +149,12 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         let hangNutQuet = UIStackView(arrangedSubviews: [nutThemAnhMoi, nutXoaQuetLai, nutThemThuCong])
         hangNutQuet.axis = .horizontal
         hangNutQuet.spacing = 6
+        nutThemAnhMoi.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        nutThemAnhMoi.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         nutXoaQuetLai.setContentHuggingPriority(.required, for: .horizontal)
+        nutXoaQuetLai.setContentCompressionResistancePriority(.required, for: .horizontal)
         nutThemThuCong.setContentHuggingPriority(.required, for: .horizontal)
+        nutThemThuCong.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // 4. Nội dung mục Thi đua & 3 mục dự phòng
         bangThiDua.khiBamQuetAnh = { [weak self] in
@@ -313,8 +318,8 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             }
         }
 
-        // Cập nhật nhãn nút Quét tương ứng với mục đang chọn
-        nutThemAnhMoi.setTitle(" Thêm ảnh \(tabHienTai.tieuDe)", for: .normal)
+        // Nhãn nút Quét giữ gọn thành "Thêm ảnh"
+        nutThemAnhMoi.setTitle(" Thêm ảnh", for: .normal)
 
         let laThiDua = (tabHienTai == .thiDua)
         bangThiDua.isHidden = !laThiDua
