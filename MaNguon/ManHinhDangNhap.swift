@@ -1,6 +1,7 @@
 import UIKit
 
-final class ManHinhDangNhap: UIViewController {
+final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
+    private let cuon = UIScrollView()
     private let chonCheDo = UISegmentedControl(items: ["Đăng nhập", "Tạo tài khoản mới"])
     private let oTen = UITextField()
     private let oMatKhau = UITextField()
@@ -13,30 +14,36 @@ final class ManHinhDangNhap: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemGroupedBackground
         taoGiaoDien()
+        dangKySuKienBanPhim()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func taoGiaoDien() {
+        cuon.alwaysBounceVertical = true
+        cuon.keyboardDismissMode = .interactive
+        cuon.showsVerticalScrollIndicator = false
+        cuon.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(cuon)
+
+        let tapAnBanPhim = UITapGestureRecognizer(target: self, action: #selector(anBanPhim))
+        tapAnBanPhim.cancelsTouchesInView = false
+        cuon.addGestureRecognizer(tapAnBanPhim)
+
         let icon = UIImageView(image: UIImage(systemName: "chart.bar.xaxis"))
         icon.tintColor = .systemBlue
-        icon.preferredSymbolConfiguration = .init(pointSize: 54, weight: .bold)
-
-        let tieuDe = UILabel()
-        tieuDe.text = "Báo Cáo Thi Đua ĐMX"
-        tieuDe.font = .systemFont(ofSize: 27, weight: .bold)
-        tieuDe.textAlignment = .center
-
-        let moTa = UILabel()
-        moTa.text = "Mỗi tài khoản lưu trữ bảng dữ liệu & danh sách nhân viên riêng trên Supabase (duongnt.io.vn/dmx). Ảnh được Apple Vision đọc trực tiếp trên iPhone."
-        moTa.font = .systemFont(ofSize: 13.5)
-        moTa.textColor = .secondaryLabel
-        moTa.numberOfLines = 0
-        moTa.textAlignment = .center
+        icon.contentMode = .scaleAspectFit
+        icon.preferredSymbolConfiguration = .init(pointSize: 38, weight: .bold)
+        icon.heightAnchor.constraint(equalToConstant: 44).isActive = true
 
         chonCheDo.selectedSegmentIndex = 0
         chonCheDo.addTarget(self, action: #selector(doiCheDo), for: .valueChanged)
-        cauHinhO(oTen, placeholder: "Tên đăng nhập (VD: sieuthi275 hoặc duongnt)", secure: false)
-        cauHinhO(oMatKhau, placeholder: "Mật khẩu (tối thiểu 6 ký tự)", secure: true)
-        cauHinhO(oNhapLaiMatKhau, placeholder: "Nhập lại mật khẩu", secure: true)
+
+        cauHinhO(oTen, placeholder: "Tên đăng nhập (VD: sieuthi275)", secure: false, returnKey: .next)
+        cauHinhO(oMatKhau, placeholder: "Mật khẩu (tối thiểu 6 ký tự)", secure: true, returnKey: .go)
+        cauHinhO(oNhapLaiMatKhau, placeholder: "Nhập lại mật khẩu", secure: true, returnKey: .go)
         oNhapLaiMatKhau.isHidden = true
 
         oTen.textContentType = .username
@@ -46,11 +53,11 @@ final class ManHinhDangNhap: UIViewController {
         oNhapLaiMatKhau.textContentType = .newPassword
 
         nutThucHien.setTitle("Đăng nhập vào hệ thống", for: .normal)
-        nutThucHien.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
+        nutThucHien.titleLabel?.font = .systemFont(ofSize: 16.5, weight: .bold)
         nutThucHien.backgroundColor = .systemBlue
         nutThucHien.tintColor = .white
-        nutThucHien.layer.cornerRadius = 13
-        nutThucHien.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        nutThucHien.layer.cornerRadius = 12
+        nutThucHien.heightAnchor.constraint(equalToConstant: 48).isActive = true
         nutThucHien.addTarget(self, action: #selector(thucHien), for: .touchUpInside)
 
         nhanThongBao.font = .systemFont(ofSize: 13, weight: .semibold)
@@ -62,35 +69,95 @@ final class ManHinhDangNhap: UIViewController {
         hangNut.axis = .vertical
         hangNut.spacing = 10
 
-        let khung = UIStackView(arrangedSubviews: [icon, tieuDe, moTa, chonCheDo, oTen, oMatKhau, oNhapLaiMatKhau, hangNut, nhanThongBao])
+        let khung = UIStackView(arrangedSubviews: [icon, chonCheDo, oTen, oMatKhau, oNhapLaiMatKhau, hangNut, nhanThongBao])
         khung.axis = .vertical
-        khung.spacing = 13
+        khung.spacing = 14
         khung.alignment = .fill
         khung.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(khung)
+        cuon.addSubview(khung)
 
         NSLayoutConstraint.activate([
-            khung.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
-            khung.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
-            khung.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -20),
-            oTen.heightAnchor.constraint(equalToConstant: 48),
-            oMatKhau.heightAnchor.constraint(equalToConstant: 48),
-            oNhapLaiMatKhau.heightAnchor.constraint(equalToConstant: 48)
+            cuon.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            cuon.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            cuon.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            cuon.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            khung.topAnchor.constraint(equalTo: cuon.contentLayoutGuide.topAnchor, constant: 28),
+            khung.bottomAnchor.constraint(equalTo: cuon.contentLayoutGuide.bottomAnchor, constant: -28),
+            khung.leadingAnchor.constraint(equalTo: cuon.frameLayoutGuide.leadingAnchor, constant: 24),
+            khung.trailingAnchor.constraint(equalTo: cuon.frameLayoutGuide.trailingAnchor, constant: -24),
+
+            chonCheDo.heightAnchor.constraint(equalToConstant: 36),
+            oTen.heightAnchor.constraint(equalToConstant: 46),
+            oMatKhau.heightAnchor.constraint(equalToConstant: 46),
+            oNhapLaiMatKhau.heightAnchor.constraint(equalToConstant: 46)
         ])
     }
 
-    private func cauHinhO(_ o: UITextField, placeholder: String, secure: Bool) {
+    private func cauHinhO(_ o: UITextField, placeholder: String, secure: Bool, returnKey: UIReturnKeyType) {
         o.placeholder = placeholder
         o.isSecureTextEntry = secure
         o.borderStyle = .roundedRect
         o.backgroundColor = .secondarySystemGroupedBackground
         o.font = .systemFont(ofSize: 16)
         o.clearButtonMode = .whileEditing
+        o.returnKeyType = returnKey
+        o.delegate = self
+    }
+
+    private func dangKySuKienBanPhim() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(banPhimThayDoi(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(banPhimAn(_:)),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+    }
+
+    @objc private func banPhimThayDoi(_ note: Notification) {
+        guard let info = note.userInfo,
+              let frameVal = info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else { return }
+        let kbFrame = view.convert(frameVal.cgRectValue, from: view.window)
+        let chieuCaoChe = max(0, view.bounds.maxY - kbFrame.minY)
+        let inset = UIEdgeInsets(top: 0, left: 0, bottom: chieuCaoChe + 16, right: 0)
+        cuon.contentInset = inset
+        cuon.scrollIndicatorInsets = inset
+    }
+
+    @objc private func banPhimAn(_ note: Notification) {
+        cuon.contentInset = .zero
+        cuon.scrollIndicatorInsets = .zero
+    }
+
+    @objc private func anBanPhim() {
+        view.endEditing(true)
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField === oTen {
+            oMatKhau.becomeFirstResponder()
+        } else if textField === oMatKhau {
+            if chonCheDo.selectedSegmentIndex == 1 {
+                oNhapLaiMatKhau.becomeFirstResponder()
+            } else {
+                thucHien()
+            }
+        } else {
+            thucHien()
+        }
+        return true
     }
 
     @objc private func doiCheDo() {
         let laDangKy = (chonCheDo.selectedSegmentIndex == 1)
         oNhapLaiMatKhau.isHidden = !laDangKy
+        oMatKhau.returnKeyType = laDangKy ? .next : .go
         nutThucHien.setTitle(laDangKy ? "Tạo tài khoản & Bắt đầu" : "Đăng nhập vào hệ thống", for: .normal)
         nhanThongBao.text = ""
     }
