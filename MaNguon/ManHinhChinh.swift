@@ -13,19 +13,8 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
 
     private let nutNgay = UIButton(type: .system)
 
-    // 1. Cụm 2 thẻ Doanh thu (Doanh thu thực & Doanh thu QĐ)
-    private let theDTThuc = TheDoanhThuView(
-        tieuDe: "💵 DOANH THU THỰC",
-        mauBatDau: UIColor(red: 0.15, green: 0.39, blue: 0.92, alpha: 1),
-        mauKetThuc: UIColor(red: 0.23, green: 0.51, blue: 0.96, alpha: 1),
-        hienChamTron: false
-    )
-    private let theDTQD = TheDoanhThuView(
-        tieuDe: "🎯 DOANH THU QĐ",
-        mauBatDau: UIColor(red: 0.09, green: 0.64, blue: 0.29, alpha: 1),
-        mauKetThuc: UIColor(red: 0.08, green: 0.50, blue: 0.24, alpha: 1),
-        hienChamTron: true
-    )
+    // 1. Cụm Tiến độ tháng & 8 thẻ Chỉ số chính (Doanh thu)
+    private let cumChiSoChinh = CumChiSoChinhView(coLon: false)
 
     // 2. Cụm 4 nút phía dưới cụm Doanh thu: Thi đua + 3 nút dự phòng
     private var cacNutMuc: [UIButton] = []
@@ -90,14 +79,8 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     // MARK: - Dựng giao diện chính
 
     private func taoGiaoDien() {
-        // 1. Cụm Doanh thu
-        theDTThuc.addTarget(self, action: #selector(bamTheDoanhThu), for: .touchUpInside)
-        theDTQD.addTarget(self, action: #selector(bamTheDoanhThu), for: .touchUpInside)
-
-        let hangDoanhThu = UIStackView(arrangedSubviews: [theDTThuc, theDTQD])
-        hangDoanhThu.axis = .horizontal
-        hangDoanhThu.spacing = 10
-        hangDoanhThu.distribution = .fillEqually
+        // 1. Cụm Tiến độ tháng & 8 thẻ Chỉ số chính (Doanh thu)
+        cumChiSoChinh.addTarget(self, action: #selector(bamTheDoanhThu), for: .touchUpInside)
 
         // 2. Cụm 4 nút phía dưới cụm Doanh thu (Thi đua + 3 nút dự phòng)
         cacNutMuc = LoaiTabMuc.allCases.map { loai in
@@ -173,18 +156,18 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
 
         taoGiaoDienKhungDuPhong()
 
-        [hangDoanhThu, hangBonNut, hangNutQuet, bangThiDua, khungDuPhong].forEach {
+        [cumChiSoChinh, hangBonNut, hangNutQuet, bangThiDua, khungDuPhong].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
 
         NSLayoutConstraint.activate([
-            hangDoanhThu.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            hangDoanhThu.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            hangDoanhThu.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            hangDoanhThu.heightAnchor.constraint(equalToConstant: 86),
+            cumChiSoChinh.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
+            cumChiSoChinh.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            cumChiSoChinh.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            cumChiSoChinh.heightAnchor.constraint(equalToConstant: 154),
 
-            hangBonNut.topAnchor.constraint(equalTo: hangDoanhThu.bottomAnchor, constant: 8),
+            hangBonNut.topAnchor.constraint(equalTo: cumChiSoChinh.bottomAnchor, constant: 8),
             hangBonNut.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
             hangBonNut.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
             hangBonNut.heightAnchor.constraint(equalToConstant: 36),
@@ -291,8 +274,13 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         nutNgay.sizeToFit()
 
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
-        theDTThuc.capNhat(doanhThu: dl.doanhThu.doanhThuThuc, target: dl.doanhThu.targetThuc)
-        theDTQD.capNhat(doanhThu: dl.doanhThu.doanhThuQuyDoi, target: dl.doanhThu.targetQuyDoi)
+        let soDat = dl.danhSachThiDua.filter { $0.daDat }.count
+        cumChiSoChinh.capNhat(
+            doanhThu: dl.doanhThu,
+            soNganhDat: soDat,
+            tongSoNganh: dl.danhSachThiDua.count,
+            ngay: ngayHienTai
+        )
         bangThiDua.ganDanhSach(dl.danhSachThiDua)
         capNhatTrangThaiMuc()
     }
@@ -403,16 +391,16 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         present(menu, animated: true)
     }
 
-    // MARK: - Tương tác 2 thẻ Doanh thu (Quét 1 ảnh hoặc nhập trực tiếp)
+    // MARK: - Tương tác cụm Doanh thu (Quét 1 hoặc 2 ảnh hoặc nhập trực tiếp)
 
     @objc private func bamTheDoanhThu() {
         let menu = UIAlertController(
-            title: "Doanh thu Thực & Quy đổi",
-            message: "Chọn ảnh chụp màn hình để đọc tự động hoặc nhập trực tiếp:",
+            title: "Chỉ số chính — Doanh thu Thực & Quy đổi",
+            message: "Chọn 1 hoặc 2 ảnh chụp màn hình 'Doanh thu hợp nhất' (Lũy kế DT thực & DT quy đổi) để đọc tự động, hoặc nhập trực tiếp:",
             preferredStyle: .actionSheet
         )
-        menu.addAction(UIAlertAction(title: "📷 Chọn 1 ảnh chụp màn hình Doanh thu", style: .default) { [weak self] _ in
-            self?.moChonAnh(cheDo: .doanhThu, gioiHan: 1)
+        menu.addAction(UIAlertAction(title: "📷 Chọn ảnh chụp màn hình Doanh thu (1-2 ảnh)", style: .default) { [weak self] _ in
+            self?.moChonAnh(cheDo: .doanhThu, gioiHan: 0)
         })
         menu.addAction(UIAlertAction(title: "✏️ Nhập / Sửa tay số liệu Doanh thu", style: .default) { [weak self] _ in
             self?.moHopThoaiNhapDoanhThu()
@@ -427,8 +415,8 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         menu.addAction(UIAlertAction(title: "Đóng", style: .cancel))
 
         if let pop = menu.popoverPresentationController {
-            pop.sourceView = theDTThuc
-            pop.sourceRect = theDTThuc.bounds
+            pop.sourceView = cumChiSoChinh
+            pop.sourceRect = cumChiSoChinh.bounds
         }
         present(menu, animated: true)
     }
@@ -443,22 +431,22 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             preferredStyle: .alert
         )
         hop.addTextField { tf in
-            tf.placeholder = "Doanh thu thực (VD: 8541)"
+            tf.placeholder = "Doanh thu thực (VD: 10957)"
             tf.keyboardType = .decimalPad
             if dt.doanhThuThuc > 0 { tf.text = String(dt.doanhThuThuc) }
         }
         hop.addTextField { tf in
-            tf.placeholder = "Target thực (VD: 14466.40)"
+            tf.placeholder = "Target thực (VD: 11128)"
             tf.keyboardType = .decimalPad
             if dt.targetThuc > 0 { tf.text = String(dt.targetThuc) }
         }
         hop.addTextField { tf in
-            tf.placeholder = "Doanh thu quy đổi (VD: 11438)"
+            tf.placeholder = "Doanh thu quy đổi (VD: 14922)"
             tf.keyboardType = .decimalPad
             if dt.doanhThuQuyDoi > 0 { tf.text = String(dt.doanhThuQuyDoi) }
         }
         hop.addTextField { tf in
-            tf.placeholder = "Target quy đổi (VD: 19444.10)"
+            tf.placeholder = "Target quy đổi (VD: 14957)"
             tf.keyboardType = .decimalPad
             if dt.targetQuyDoi > 0 { tf.text = String(dt.targetQuyDoi) }
         }
@@ -466,12 +454,13 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         hop.addAction(UIAlertAction(title: "Lưu", style: .default) { [weak self] _ in
             guard let self = self, let tfs = hop.textFields, tfs.count >= 4 else { return }
             var moi = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
-            moi.doanhThu = ThongTinDoanhThu(
+            let nhap = ThongTinDoanhThu(
                 doanhThuThuc: self.docSoTuO(tfs[0].text),
                 targetThuc: self.docSoTuO(tfs[1].text),
                 doanhThuQuyDoi: self.docSoTuO(tfs[2].text),
                 targetQuyDoi: self.docSoTuO(tfs[3].text)
             )
+            moi.doanhThu = moi.doanhThu.gop(voi: nhap)
             KhoDuLieu.dungChung.luu(moi)
             self.napDuLieu()
         })
@@ -525,9 +514,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
 
             switch cheDo {
             case .doanhThu:
-                if let anh = cacAnh.first {
-                    self.xuLyQuetDoanhThu(anh)
-                }
+                self.xuLyQuetDoanhThu(cacAnh)
             case .theoMuc(.thiDua):
                 self.xuLyQuetThiDua(cacAnh)
             case .theoMuc:
@@ -556,19 +543,25 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         )
     }
 
-    private func xuLyQuetDoanhThu(_ anh: UIImage) {
-        hienTienTrinh("Đang đọc ảnh Doanh thu...")
-        DichVuDocAnh.dungChung.quetAnhDoanhThu(anh: anh) { [weak self] dt in
-            guard let self = self else { return }
-            self.anTienTrinh()
-            var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
-            dl.doanhThu = dt
-            KhoDuLieu.dungChung.luu(dl)
-            self.napDuLieu()
-            if !dt.coDuLieu {
-                self.moHopThoaiNhapDoanhThu()
+    private func xuLyQuetDoanhThu(_ cacAnh: [UIImage]) {
+        hienTienTrinh("Đang đọc \(cacAnh.count) ảnh Doanh thu...")
+        DichVuDocAnh.dungChung.quetAnhDoanhThu(
+            danhSachAnh: cacAnh,
+            tienTrinh: { [weak self] tt in
+                self?.nhanTienTrinh.text = tt
+            },
+            hoanTat: { [weak self] dtMoi in
+                guard let self = self else { return }
+                self.anTienTrinh()
+                var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngayHienTai)
+                dl.doanhThu = dl.doanhThu.gop(voi: dtMoi)
+                KhoDuLieu.dungChung.luu(dl)
+                self.napDuLieu()
+                if !dl.doanhThu.coDuLieu {
+                    self.moHopThoaiNhapDoanhThu()
+                }
             }
-        }
+        )
     }
 
     private func hienTienTrinh(_ chu: String) {
@@ -660,10 +653,25 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     private func napDuLieuMau() {
         var dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
         dl.doanhThu = ThongTinDoanhThu(
-            doanhThuThuc: 8541.00,
-            targetThuc: 14466.40,
-            doanhThuQuyDoi: 11438.00,
-            targetQuyDoi: 19444.10
+            doanhThuThuc: 10957.00,
+            targetThuc: 11128.00,
+            duKienThuc: 11698.00,
+            phanTramHTThuc: 98.5,
+            doanhThuQuyDoi: 14922.00,
+            targetQuyDoi: 14957.00,
+            duKienQuyDoi: 15936.00,
+            phanTramHTQuyDoi: 99.8,
+            phanTramTraGop: 42.7,
+            doanhThuTraGop: 6379.00,
+            luotKhach: 19149,
+            soBill: 2238,
+            phanTramPVTC: 11.7,
+            tangGiamCungKy: -5.6,
+            coTangGiam: true,
+            tb3Thang: 11609,
+            soNgayDaQua: 29,
+            tongSoNgay: 31,
+            phanTramTienDoThang: 94.0
         )
         let mau: [DongThiDua] = [
             DongThiDua(tenNganhHang: "T09 - T10 IPHONE 18 series, iPhone Duo", loaiChiTieu: .doanhThu, thucHien: 4476.28, target: 3493.60),

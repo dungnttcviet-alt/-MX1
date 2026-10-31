@@ -58,17 +58,25 @@ final class DichVuDocAnh {
         }
     }
 
-    // MARK: - 2. Quét ảnh chụp màn hình Doanh thu (Doanh thu thực & Doanh thu QĐ)
+    // MARK: - 2. Quét danh sách ảnh chụp màn hình Doanh thu (Lũy kế DT thực & DT quy đổi)
 
     func quetAnhDoanhThu(
-        anh: UIImage,
+        danhSachAnh: [UIImage],
+        tienTrinh: ((String) -> Void)? = nil,
         hoanTat: @escaping (ThongTinDoanhThu) -> Void
     ) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let phanTu = self.thucHienOCR(anh: anh)
-            let ketQua = self.phanTichDoanhThu(phanTu: phanTu)
+            var ketQuaGop = ThongTinDoanhThu()
+            for (chiSo, anh) in danhSachAnh.enumerated() {
+                DispatchQueue.main.async {
+                    tienTrinh?("Đang đọc ảnh Doanh thu \(chiSo + 1)/\(danhSachAnh.count)...")
+                }
+                let phanTu = self.thucHienOCR(anh: anh)
+                let kqAnh = self.phanTichDoanhThu(phanTu: phanTu)
+                ketQuaGop = ketQuaGop.gop(voi: kqAnh)
+            }
             DispatchQueue.main.async {
-                hoanTat(ketQua)
+                hoanTat(ketQuaGop)
             }
         }
     }
@@ -250,85 +258,248 @@ final class DichVuDocAnh {
         return nil
     }
 
-    // MARK: - Phân tích ảnh chụp màn hình Doanh thu (Thực & Quy đổi)
+    // MARK: - Phân tích ảnh chụp màn hình "Doanh thu hợp nhất" (Lũy kế DT thực & DT quy đổi)
+
+    private func boDau(_ chuoi: String) -> String {
+        chuoi
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "D")
+            .uppercased()
+    }
+
+    private func chuyenChuoiThanhSoDoanhThu(_ chuoi: String) -> Double? {
+        var s = chuoi
+            .replacingOccurrences(of: "%", with: "")
+            .replacingOccurrences(of: "…", with: "")
+            .replacingOccurrences(of: "...", with: "")
+            .replacingOccurrences(of: "+", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !s.isEmpty else { return nil }
+
+        if s.contains(",") && s.contains(".") {
+            let viTriPhay = s.lastIndex(of: ",")!
+            let viTriCham = s.lastIndex(of: ".")!
+            if viTriPhay > viTriCham {
+                // Định dạng kiểu VN: 8.541,00 -> 8541.00
+                s = s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
+            } else {
+                // Định dạng kiểu US: 10,957.00 -> 10957.00
+                s = s.replacingOccurrences(of: ",", with: "")
+            }
+        } else if s.contains(",") {
+            // Nếu dấu phẩy ngăn cách hàng nghìn (ví dụ 10,957 hoặc 19,149)
+            if s.range(of: "^-?\\d{1,3}(,\\d{3})+$", options: .regularExpression) != nil {
+                s = s.replacingOccurrences(of: ",", with: "")
+            } else {
+                s = s.replacingOccurrences(of: ",", with: ".")
+            }
+        } else if s.contains(".") {
+            // Nếu dấu chấm ngăn cách hàng nghìn (ví dụ 14.416)
+            if s.range(of: "^-?\\d{1,3}(\\.\\d{3})+$", options: .regularExpression) != nil {
+                s = s.replacingOccurrences(of: ".", with: "")
+            }
+        }
+
+        if let range = s.range(of: "-?\\d+(\\.\\d+)?", options: .regularExpression) {
+            return Double(String(s[range]))
+        }
+        return nil
+    }
+
+    private func trichCacSo(trong chuoi: String) -> [Double] {
+        guard let regex = try? NSRegularExpression(pattern: "-?\\d+[\\d.,]*") else { return [] }
+        let ns = chuoi as NSString
+        let matches = regex.matches(in: chuoi, range: NSRange(location: 0, length: ns.length))
+        return matches.compactMap { m in
+            let sub = ns.substring(with: m.range)
+            return chuyenChuoiThanhSoDoanhThu(sub)
+        }
+    }
 
     private func phanTichDoanhThu(phanTu: [PhanTuVanBan]) -> ThongTinDoanhThu {
         var kq = ThongTinDoanhThu()
 
-        let mocDTThuc = phanTu.first {
-            let u = $0.chu.uppercased()
-            return u.contains("DOANH THU THỰC") || u.contains("DT THỰC") || u.contains("THỰC")
-        }
-        let mocDTQD = phanTu.first {
-            let u = $0.chu.uppercased()
-            return u.contains("DOANH THU QĐ") || u.contains("QUY ĐỔI") || u.contains("DT QĐ")
+        // 1. Tìm thanh "Quỹ thời gian: 29/31 ngày" & phần trăm tiến độ tháng
+        var yBatDauVungThe: CGFloat = 0.44
+        if let mocQTG = phanTu.first(where: {
+            let u = boDau($0.chu)
+            return u.contains("QUY THOI GIAN") || u.contains("TIEN DO THANG")
+        }) {
+            yBatDauVungThe = mocQTG.y + 0.02
+            let cungHang = phanTu
+                .filter { abs($0.y - mocQTG.y) < 0.035 }
+                .sorted { $0.x < $1.x }
+            let chuoiHang = cungHang.map { $0.chu }.joined(separator: " ")
+
+            if let regex = try? NSRegularExpression(pattern: "(\\d{1,2})\\s*/\\s*(\\d{1,2})"),
+               let m = regex.firstMatch(in: chuoiHang, range: NSRange(location: 0, length: (chuoiHang as NSString).length)) {
+                let ns = chuoiHang as NSString
+                let d1 = Int(ns.substring(with: m.range(at: 1))) ?? 0
+                let d2 = Int(ns.substring(with: m.range(at: 2))) ?? 0
+                if d1 > 0 && d2 > 0 {
+                    kq.soNgayDaQua = d1
+                    kq.tongSoNgay = d2
+                }
+            }
+            if let ptPhanTram = cungHang.last(where: { $0.chu.contains("%") }),
+               let val = chuyenChuoiThanhSoDoanhThu(ptPhanTram.chu) {
+                kq.phanTramTienDoThang = val
+            } else if kq.soNgayDaQua > 0 && kq.tongSoNgay > 0 {
+                kq.phanTramTienDoThang = (Double(kq.soNgayDaQua) / Double(kq.tongSoNgay)) * 100.0
+            }
+        } else if let mocNut = phanTu.filter({
+            let u = boDau($0.chu)
+            return u.contains("XUAT EXCEL") || u.contains("XUAT THEO MAU") || u.contains("TOAN CONG TY")
+        }).max(by: { $0.y < $1.y }) {
+            yBatDauVungThe = mocNut.y + 0.03
         }
 
-        struct SoToaDo {
-            let giaTri: Double
-            let x: CGFloat
-            let y: CGFloat
-            let laTarget: Bool
+        // 2. Lọc vùng các thẻ chỉ số bên dưới thanh Quỹ thời gian (và trên thanh tab đáy)
+        let vungThe = phanTu.filter { $0.y > yBatDauVungThe && $0.y < 0.94 }
+
+        // Kiểm tra xem đây là ảnh "DT quy đổi" hay ảnh "DT thực"
+        let laAnhQuyDoi = vungThe.contains { pt in
+            let u = boDau(pt.chu)
+            return u.contains("DT QUY DOI") || u.contains("KHOAN VAY") || u.contains("TRA GOP QD")
         }
 
-        var danhSachSo: [SoToaDo] = []
-        for pt in phanTu {
-            let inHoa = pt.chu.uppercased()
-            if inHoa.contains("%") { continue }
-            let laTarget = inHoa.contains("TARGET") || inHoa.contains("MỤC TIÊU")
+        // Hàm lấy số chính và dòng phụ của 1 ô thẻ trong lưới 2 cột
+        func layDuLieuThe(thoaMan: (String) -> Bool) -> (soChinh: Double?, vanBanPhu: String)? {
+            guard let moc = vungThe.sorted(by: { $0.y < $1.y }).first(where: { thoaMan(boDau($0.chu)) }) else {
+                return nil
+            }
+            let laCotTrai = moc.x < 0.47
+            let trongThe = vungThe.filter { pt in
+                let cungCot = laCotTrai ? (pt.x < 0.47) : (pt.x >= 0.47)
+                return cungCot && pt.y > moc.y + 0.01 && pt.y < moc.y + 0.115
+            }.sorted {
+                if abs($0.y - $1.y) < 0.012 { return $0.x < $1.x }
+                return $0.y < $1.y
+            }
 
-            let mauSo = "\\d+[\\d.,]*"
-            if let regex = try? NSRegularExpression(pattern: mauSo) {
-                let ns = pt.chu as NSString
-                let matches = regex.matches(in: pt.chu, range: NSRange(location: 0, length: ns.length))
-                for m in matches {
-                    let chuoiSo = ns.substring(with: m.range)
-                    if let val = chuyenChuoiThanhSo(chuoiSo), val > 0 {
-                        danhSachSo.append(SoToaDo(giaTri: val, x: pt.x, y: pt.y, laTarget: laTarget))
+            var soChinh: Double?
+            for pt in trongThe where pt.y < moc.y + 0.068 {
+                let u = boDau(pt.chu)
+                if u.contains("TRIEU DONG") || u.contains("TARGET") || u.contains("BILL") || u.contains("TRA GOP") {
+                    continue
+                }
+                if let val = chuyenChuoiThanhSoDoanhThu(pt.chu) {
+                    soChinh = val
+                    break
+                }
+            }
+            let vanBanPhu = trongThe.map { $0.chu }.joined(separator: " ")
+            return (soChinh, vanBanPhu)
+        }
+
+        // 3A. Ô "DT thực"
+        if !laAnhQuyDoi, let theDTThuc = layDuLieuThe(thoaMan: { $0 == "DT THUC" || ($0.contains("DT THUC") && !$0.contains("LUY KE")) }) {
+            if let so = theDTThuc.soChinh { kq.doanhThuThuc = so }
+        }
+
+        // 3B. Ô "DT quy đổi"
+        if laAnhQuyDoi, let theDTQD = layDuLieuThe(thoaMan: { $0 == "DT QUY DOI" || ($0.contains("DT QUY DOI") && !$0.contains("KHOAN VAY")) }) {
+            if let so = theDTQD.soChinh { kq.doanhThuQuyDoi = so }
+        }
+
+        // 3C. Ô "DT dự kiến"
+        if let theDuKien = layDuLieuThe(thoaMan: { $0.contains("DT DU KIEN") || $0 == "DU KIEN" }) {
+            if let so = theDuKien.soChinh {
+                if laAnhQuyDoi {
+                    kq.duKienQuyDoi = so
+                } else {
+                    kq.duKienThuc = so
+                }
+            }
+        }
+
+        // 3D. Ô "% HT target" -> Lấy % HT và "Target trọn kỳ 11,128"
+        if let theHT = layDuLieuThe(thoaMan: { $0.contains("HT TARGET") || ($0.contains("TARGET") && $0.contains("%")) }) {
+            if let so = theHT.soChinh {
+                if laAnhQuyDoi {
+                    kq.phanTramHTQuyDoi = so
+                } else {
+                    kq.phanTramHTThuc = so
+                }
+            }
+            let phuKhongDau = boDau(theHT.vanBanPhu)
+            if let range = phuKhongDau.range(of: "KY\\s*([0-9][0-9.,]*)", options: .regularExpression) ??
+                phuKhongDau.range(of: "TARGET[^0-9]*([0-9][0-9.,]*)", options: .regularExpression) {
+                let chuoiCon = String(phuKhongDau[range])
+                if let targetVal = trichCacSo(trong: chuoiCon).first, targetVal > 0 {
+                    if laAnhQuyDoi {
+                        kq.targetQuyDoi = targetVal
+                    } else {
+                        kq.targetThuc = targetVal
                     }
                 }
             }
         }
 
-        if let thuc = mocDTThuc, let qd = mocDTQD, abs(thuc.x - qd.x) > 0.2 {
-            let ranhGioiX = (thuc.x + qd.x) / 2.0
-            let soBenTrai = danhSachSo.filter { $0.x < ranhGioiX && $0.y > thuc.y }.sorted { $0.y < $1.y }
-            let soBenPhai = danhSachSo.filter { $0.x >= ranhGioiX && $0.y > qd.y }.sorted { $0.y < $1.y }
+        // 3E. Ô "TT vs TB 3 tháng" -> Lấy % tăng/giảm và TB3T cùng cửa sổ
+        if let theTB3T = layDuLieuThe(thoaMan: { $0.contains("TB 3 THANG") || $0.contains("TT VS") }) {
+            if let so = theTB3T.soChinh {
+                kq.tangGiamCungKy = so
+                kq.coTangGiam = true
+            }
+            let phuKhongDau = boDau(theTB3T.vanBanPhu)
+            if let range = phuKhongDau.range(of: "SO:?\\s*([0-9][0-9.,]*)", options: .regularExpression) {
+                let chuoiCon = String(phuKhongDau[range])
+                if let tbVal = trichCacSo(trong: chuoiCon).last, tbVal > 0 {
+                    kq.tb3Thang = tbVal
+                }
+            }
+        }
 
-            if let chinhTrai = soBenTrai.first(where: { !$0.laTarget }) ?? soBenTrai.first {
-                kq.doanhThuThuc = chinhTrai.giaTri
+        // 3F. Ô "TLPVTC lũy kế" -> Lấy % PVTC, số bill, số khách
+        if let thePVTC = layDuLieuThe(thoaMan: { $0.contains("TLPVTC") || $0.contains("PVTC") }) {
+            if let so = thePVTC.soChinh {
+                kq.phanTramPVTC = so
             }
-            if let targetTrai = soBenTrai.first(where: { $0.laTarget }) ?? (soBenTrai.count > 1 ? soBenTrai[1] : nil) {
-                kq.targetThuc = targetTrai.giaTri
+            let phuKhongDau = boDau(thePVTC.vanBanPhu)
+            if let rBill = phuKhongDau.range(of: "([0-9][0-9.,]*)\\s*BILL", options: .regularExpression) {
+                if let bVal = trichCacSo(trong: String(phuKhongDau[rBill])).first {
+                    kq.soBill = bVal
+                }
             }
+            if let rKhach = phuKhongDau.range(of: "([0-9][0-9.,]*)\\s*KHACH", options: .regularExpression) {
+                if let kVal = trichCacSo(trong: String(phuKhongDau[rKhach])).first {
+                    kq.luotKhach = kVal
+                }
+            }
+        }
 
-            if let chinhPhai = soBenPhai.first(where: { !$0.laTarget }) ?? soBenPhai.first {
-                kq.doanhThuQuyDoi = chinhPhai.giaTri
+        // 3G. Ô "Tỷ trọng trả chậm" -> Lấy % trả góp và DT trả góp
+        if let theTraCham = layDuLieuThe(thoaMan: { $0.contains("TRA CHAM") || $0.contains("TY TRONG") }) {
+            if let so = theTraCham.soChinh {
+                kq.phanTramTraGop = so
             }
-            if let targetPhai = soBenPhai.first(where: { $0.laTarget }) ?? (soBenPhai.count > 1 ? soBenPhai[1] : nil) {
-                kq.targetQuyDoi = targetPhai.giaTri
+            let phuKhongDau = boDau(theTraCham.vanBanPhu)
+            if let rTG = phuKhongDau.range(of: "TRA GOP(?:\\s*QD)?\\s*([0-9][0-9.,]*)", options: .regularExpression) {
+                if let tgVal = trichCacSo(trong: String(phuKhongDau[rTG])).first {
+                    kq.doanhThuTraGop = tgVal
+                }
             }
-        } else {
-            let sapXep = danhSachSo.sorted {
-                if abs($0.y - $1.y) < 0.03 { return $0.x < $1.x }
-                return $0.y < $1.y
-            }
-            let khongTarget = sapXep.filter { !$0.laTarget }
-            let coTarget = sapXep.filter { $0.laTarget }
+        }
 
-            if khongTarget.count >= 2 {
-                kq.doanhThuThuc = khongTarget[0].giaTri
-                kq.doanhThuQuyDoi = khongTarget[1].giaTri
-            } else if khongTarget.count == 1 {
-                kq.doanhThuThuc = khongTarget[0].giaTri
-            }
-
-            if coTarget.count >= 2 {
-                kq.targetThuc = coTarget[0].giaTri
-                kq.targetQuyDoi = coTarget[1].giaTri
-            } else if khongTarget.count >= 4 {
-                kq.targetThuc = khongTarget[2].giaTri
-                kq.targetQuyDoi = khongTarget[3].giaTri
+        // 4. Dự phòng nếu người dùng quét ảnh đã tổng hợp sẵn kiểu Ảnh 3 (DOANH THU THỰC / DOANH THU QĐ)
+        if !kq.coDuLieu {
+            if let mocThuc = phanTu.first(where: { boDau($0.chu).contains("DOANH THU THUC") }),
+               let mocQD = phanTu.first(where: { boDau($0.chu).contains("DOANH THU QD") }) {
+                let ranhX = (mocThuc.x + mocQD.x) / 2.0
+                let vung = phanTu.filter { $0.y > min(mocThuc.y, mocQD.y) && $0.y < min(mocThuc.y, mocQD.y) + 0.18 }
+                let trai = vung.filter { $0.x < ranhX }.sorted { $0.y < $1.y }
+                let phai = vung.filter { $0.x >= ranhX }.sorted { $0.y < $1.y }
+                for pt in trai {
+                    if boDau(pt.chu).contains("TARGET"), let v = trichCacSo(trong: pt.chu).first { kq.targetThuc = v }
+                    else if kq.doanhThuThuc == 0, let v = chuyenChuoiThanhSoDoanhThu(pt.chu), v > 0 { kq.doanhThuThuc = v }
+                }
+                for pt in phai {
+                    if boDau(pt.chu).contains("TARGET"), let v = trichCacSo(trong: pt.chu).first { kq.targetQuyDoi = v }
+                    else if kq.doanhThuQuyDoi == 0, let v = chuyenChuoiThanhSoDoanhThu(pt.chu), v > 0 { kq.doanhThuQuyDoi = v }
+                }
             }
         }
 

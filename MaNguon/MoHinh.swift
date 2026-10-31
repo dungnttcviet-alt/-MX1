@@ -60,11 +60,147 @@ enum LoaiChiTieuThiDua: String, Codable, CaseIterable {
 struct ThongTinDoanhThu: Codable, Hashable {
     var doanhThuThuc: Double = 0
     var targetThuc: Double = 0
+    var duKienThuc: Double = 0
+    var phanTramHTThuc: Double = 0
+
     var doanhThuQuyDoi: Double = 0
     var targetQuyDoi: Double = 0
+    var duKienQuyDoi: Double = 0
+    var phanTramHTQuyDoi: Double = 0
+
+    var phanTramTraGop: Double = 0
+    var doanhThuTraGop: Double = 0
+
+    var luotKhach: Double = 0
+    var soBill: Double = 0
+    var phanTramPVTC: Double = 0
+
+    var tangGiamCungKy: Double = 0
+    var coTangGiam: Bool = false
+    var tb3Thang: Double = 0
+
+    var soNgayDaQua: Int = 0
+    var tongSoNgay: Int = 0
+    var phanTramTienDoThang: Double = 0
+
+    init(
+        doanhThuThuc: Double = 0,
+        targetThuc: Double = 0,
+        duKienThuc: Double = 0,
+        phanTramHTThuc: Double = 0,
+        doanhThuQuyDoi: Double = 0,
+        targetQuyDoi: Double = 0,
+        duKienQuyDoi: Double = 0,
+        phanTramHTQuyDoi: Double = 0,
+        phanTramTraGop: Double = 0,
+        doanhThuTraGop: Double = 0,
+        luotKhach: Double = 0,
+        soBill: Double = 0,
+        phanTramPVTC: Double = 0,
+        tangGiamCungKy: Double = 0,
+        coTangGiam: Bool = false,
+        tb3Thang: Double = 0,
+        soNgayDaQua: Int = 0,
+        tongSoNgay: Int = 0,
+        phanTramTienDoThang: Double = 0
+    ) {
+        self.doanhThuThuc = doanhThuThuc
+        self.targetThuc = targetThuc
+        self.duKienThuc = duKienThuc
+        self.phanTramHTThuc = phanTramHTThuc
+        self.doanhThuQuyDoi = doanhThuQuyDoi
+        self.targetQuyDoi = targetQuyDoi
+        self.duKienQuyDoi = duKienQuyDoi
+        self.phanTramHTQuyDoi = phanTramHTQuyDoi
+        self.phanTramTraGop = phanTramTraGop
+        self.doanhThuTraGop = doanhThuTraGop
+        self.luotKhach = luotKhach
+        self.soBill = soBill
+        self.phanTramPVTC = phanTramPVTC
+        self.tangGiamCungKy = tangGiamCungKy
+        self.coTangGiam = coTangGiam
+        self.tb3Thang = tb3Thang
+        self.soNgayDaQua = soNgayDaQua
+        self.tongSoNgay = tongSoNgay
+        self.phanTramTienDoThang = phanTramTienDoThang
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        doanhThuThuc = (try? c.decode(Double.self, forKey: .doanhThuThuc)) ?? 0
+        targetThuc = (try? c.decode(Double.self, forKey: .targetThuc)) ?? 0
+        duKienThuc = (try? c.decode(Double.self, forKey: .duKienThuc)) ?? 0
+        phanTramHTThuc = (try? c.decode(Double.self, forKey: .phanTramHTThuc)) ?? 0
+        doanhThuQuyDoi = (try? c.decode(Double.self, forKey: .doanhThuQuyDoi)) ?? 0
+        targetQuyDoi = (try? c.decode(Double.self, forKey: .targetQuyDoi)) ?? 0
+        duKienQuyDoi = (try? c.decode(Double.self, forKey: .duKienQuyDoi)) ?? 0
+        phanTramHTQuyDoi = (try? c.decode(Double.self, forKey: .phanTramHTQuyDoi)) ?? 0
+        phanTramTraGop = (try? c.decode(Double.self, forKey: .phanTramTraGop)) ?? 0
+        doanhThuTraGop = (try? c.decode(Double.self, forKey: .doanhThuTraGop)) ?? 0
+        luotKhach = (try? c.decode(Double.self, forKey: .luotKhach)) ?? 0
+        soBill = (try? c.decode(Double.self, forKey: .soBill)) ?? 0
+        phanTramPVTC = (try? c.decode(Double.self, forKey: .phanTramPVTC)) ?? 0
+        tangGiamCungKy = (try? c.decode(Double.self, forKey: .tangGiamCungKy)) ?? 0
+        coTangGiam = (try? c.decode(Bool.self, forKey: .coTangGiam)) ?? (tangGiamCungKy != 0)
+        tb3Thang = (try? c.decode(Double.self, forKey: .tb3Thang)) ?? 0
+        soNgayDaQua = (try? c.decode(Int.self, forKey: .soNgayDaQua)) ?? 0
+        tongSoNgay = (try? c.decode(Int.self, forKey: .tongSoNgay)) ?? 0
+        phanTramTienDoThang = (try? c.decode(Double.self, forKey: .phanTramTienDoThang)) ?? 0
+    }
 
     var coDuLieu: Bool {
-        doanhThuThuc > 0 || targetThuc > 0 || doanhThuQuyDoi > 0 || targetQuyDoi > 0
+        doanhThuThuc > 0 || targetThuc > 0 || doanhThuQuyDoi > 0 || targetQuyDoi > 0 || luotKhach > 0 || phanTramTraGop > 0
+    }
+
+    /// % Quy đổi = (DT Quy đổi - DT Thực) / DT Thực * 100
+    var phanTramQuyDoi: Double {
+        guard doanhThuThuc > 0, doanhThuQuyDoi > 0 else { return 0 }
+        return ((doanhThuQuyDoi - doanhThuThuc) / doanhThuThuc) * 100.0
+    }
+
+    /// % Hoàn thành QĐ dự kiến
+    var phanTramHTQDDuKienHienThi: Double {
+        if phanTramHTQuyDoi > 0 { return phanTramHTQuyDoi }
+        if targetQuyDoi > 0, doanhThuQuyDoi > 0 {
+            return (doanhThuQuyDoi / targetQuyDoi) * 100.0
+        }
+        if phanTramHTThuc > 0 { return phanTramHTThuc }
+        if targetThuc > 0, doanhThuThuc > 0 {
+            return (doanhThuThuc / targetThuc) * 100.0
+        }
+        return 0
+    }
+
+    /// Gộp dữ liệu từ ảnh mới quét (ví dụ quét ảnh DT thực rồi quét tiếp ảnh DT quy đổi)
+    func gop(voi moi: ThongTinDoanhThu) -> ThongTinDoanhThu {
+        var kq = self
+        if moi.doanhThuThuc > 0 { kq.doanhThuThuc = moi.doanhThuThuc }
+        if moi.targetThuc > 0 { kq.targetThuc = moi.targetThuc }
+        if moi.duKienThuc > 0 { kq.duKienThuc = moi.duKienThuc }
+        if moi.phanTramHTThuc > 0 { kq.phanTramHTThuc = moi.phanTramHTThuc }
+
+        if moi.doanhThuQuyDoi > 0 { kq.doanhThuQuyDoi = moi.doanhThuQuyDoi }
+        if moi.targetQuyDoi > 0 { kq.targetQuyDoi = moi.targetQuyDoi }
+        if moi.duKienQuyDoi > 0 { kq.duKienQuyDoi = moi.duKienQuyDoi }
+        if moi.phanTramHTQuyDoi > 0 { kq.phanTramHTQuyDoi = moi.phanTramHTQuyDoi }
+
+        if moi.phanTramTraGop > 0 { kq.phanTramTraGop = moi.phanTramTraGop }
+        if moi.doanhThuTraGop > 0 { kq.doanhThuTraGop = moi.doanhThuTraGop }
+
+        if moi.luotKhach > 0 { kq.luotKhach = moi.luotKhach }
+        if moi.soBill > 0 { kq.soBill = moi.soBill }
+        if moi.phanTramPVTC > 0 { kq.phanTramPVTC = moi.phanTramPVTC }
+
+        if moi.coTangGiam || moi.tangGiamCungKy != 0 {
+            kq.tangGiamCungKy = moi.tangGiamCungKy
+            kq.coTangGiam = true
+        }
+        if moi.tb3Thang > 0 { kq.tb3Thang = moi.tb3Thang }
+
+        if moi.soNgayDaQua > 0 { kq.soNgayDaQua = moi.soNgayDaQua }
+        if moi.tongSoNgay > 0 { kq.tongSoNgay = moi.tongSoNgay }
+        if moi.phanTramTienDoThang > 0 { kq.phanTramTienDoThang = moi.phanTramTienDoThang }
+        return kq
     }
 }
 
@@ -357,8 +493,21 @@ extension Double {
         return df
     }()
 
+    private static let boDinhDangNguyenVN: NumberFormatter = {
+        let df = NumberFormatter()
+        df.locale = Locale(identifier: "vi_VN")
+        df.numberStyle = .decimal
+        df.minimumFractionDigits = 0
+        df.maximumFractionDigits = 0
+        return df
+    }()
+
     var chuoiSoVN: String {
         Double.boDinhDangVN.string(from: NSNumber(value: self)) ?? String(format: "%.2f", self)
+    }
+
+    var chuoiSoNguyenVN: String {
+        Double.boDinhDangNguyenVN.string(from: NSNumber(value: self.rounded())) ?? String(format: "%.0f", self)
     }
 
     var chuoiPhanTramVN: String {
