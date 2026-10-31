@@ -948,11 +948,26 @@ final class KhoDuLieu {
             guard !khoaMoi.isEmpty else { continue }
 
             if let viTri = ketQua.firstIndex(where: { chuanHoaKhoaSoSanh($0.tenNganhHang) == khoaMoi }) {
-                let dongCu = ketQua[viTri]
-                if dongMoi.target > 0 || dongMoi.thucHien > 0 || (dongCu.target == 0 && dongCu.thucHien == 0) {
-                    dongMoi.id = dongCu.id
-                    ketQua[viTri] = dongMoi
+                var dongCu = ketQua[viTri]
+                // Giữ tên đầy đủ hơn nếu một trong hai ảnh bị cắt chữ "..."
+                if dongMoi.tenNganhHangGoc.count > dongCu.tenNganhHangGoc.count && !dongMoi.tenNganhHangGoc.hasSuffix("...") {
+                    dongCu.tenNganhHangGoc = dongMoi.tenNganhHangGoc
+                    dongCu.tenNganhHang = dongMoi.tenNganhHang
                 }
+                dongCu.loaiChiTieu = dongMoi.loaiChiTieu
+                if dongMoi.thucHien > 0 {
+                    dongCu.thucHien = dongMoi.thucHien
+                }
+                if dongMoi.target > 0 {
+                    dongCu.target = dongMoi.target
+                }
+                if let htGoc = dongMoi.phanTramHTGoc, htGoc > 0 {
+                    dongCu.phanTramHTGoc = htGoc
+                }
+                if let dbGoc = dongMoi.phanTramDuBaoGoc, dbGoc > 0 {
+                    dongCu.phanTramDuBaoGoc = dbGoc
+                }
+                ketQua[viTri] = dongCu
             } else {
                 ketQua.append(dongMoi)
             }

@@ -237,7 +237,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             cumChiSoChinh.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
             cumChiSoChinh.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
             cumChiSoChinh.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            cumChiSoChinh.heightAnchor.constraint(equalToConstant: 158),
+            cumChiSoChinh.heightAnchor.constraint(equalToConstant: 156),
 
             hangBonNut.topAnchor.constraint(equalTo: cumChiSoChinh.bottomAnchor, constant: 8),
             hangBonNut.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
@@ -406,7 +406,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
     @objc private func bamThemAnhMoi() {
         switch tabHienTai {
         case .thiDua:
-            moChonAnh(cheDo: .thiDua, gioiHan: 0)
+            moHuongDanQuetAnhThiDua()
         case .nhanVien:
             moChonAnh(cheDo: .doanhThuNhanVien, gioiHan: 0)
         case .duPhong2, .duPhong3:
@@ -418,6 +418,19 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             tb.addAction(UIAlertAction(title: "Đã hiểu", style: .default))
             present(tb, animated: true)
         }
+    }
+
+    private func moHuongDanQuetAnhThiDua() {
+        let hd = UIAlertController(
+            title: "Nhập ảnh Thi đua (Target & Thực hiện)",
+            message: "Hãy chọn cùng lúc các ảnh chụp màn hình bảng Thi đua:\n\n1️⃣ Ảnh chụp cột TARGET (CHƯƠNG TRÌNH | TARGET)\n2️⃣ Ảnh chụp cột ĐẠT ĐƯỢC (CHƯƠNG TRÌNH | THỰC HIỆN)\n\n(Nếu danh sách dài cần cuộn trang, bạn có thể chọn nhiều ảnh Target và nhiều ảnh Thực hiện cùng lúc — hệ thống sẽ tự động khớp từng ngành hàng).",
+            preferredStyle: .alert
+        )
+        hd.addAction(UIAlertAction(title: "Chọn ảnh Thi đua ngay", style: .default) { [weak self] _ in
+            self?.moChonAnh(cheDo: .thiDua, gioiHan: 0)
+        })
+        hd.addAction(UIAlertAction(title: "Huỷ", style: .cancel))
+        present(hd, animated: true)
     }
 
     @objc private func bamXoaQuetLai() {
@@ -443,7 +456,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
 
         if dl.danhSachThiDua.isEmpty {
-            moChonAnh(cheDo: .thiDua, gioiHan: 0)
+            moHuongDanQuetAnhThiDua()
             return
         }
 
@@ -458,7 +471,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             moi.danhSachThiDua = []
             KhoDuLieu.dungChung.luu(moi)
             self.napDuLieu()
-            self.moChonAnh(cheDo: .thiDua, gioiHan: 0)
+            self.moHuongDanQuetAnhThiDua()
         })
         hoi.addAction(UIAlertAction(title: "Chỉ xoá sạch danh sách", style: .destructive) { [weak self] _ in
             guard let self = self else { return }

@@ -152,14 +152,8 @@ final class CumChiSoChinhView: UIControl {
     var khiBamVungThe: (() -> Void)?
 
     private var cheDoDoanhThu: LoaiCheDoDoanhThu = .luyKe
-    private let khungTienDo = UIView()
     private let nutLuyKe = UIButton(type: .custom)
     private let nutRealtime = UIButton(type: .custom)
-    private let nhanTienDoTrai = UILabel()
-    private let nhanTienDoPhai = UILabel()
-    private let nenThanhTienDo = UIView()
-    private let mauThanhTienDo = UIView()
-    private var rangBuocRongTienDo: NSLayoutConstraint?
 
     private let theDTThuc = TheDoanhThuView(
         tieuDe: "💵 DOANH THU THỰC",
@@ -205,7 +199,6 @@ final class CumChiSoChinhView: UIControl {
     )
 
     private let coLon: Bool
-    private var tyLeTienDo: CGFloat = 0
 
     init(coLon: Bool = false) {
         self.coLon = coLon
@@ -218,84 +211,24 @@ final class CumChiSoChinhView: UIControl {
     }
 
     private func taoGiaoDien() {
-        khungTienDo.backgroundColor = .systemBackground
-        khungTienDo.layer.cornerRadius = 10
-        khungTienDo.layer.borderWidth = 1
-        khungTienDo.layer.borderColor = UIColor.systemGray5.cgColor
-        khungTienDo.isUserInteractionEnabled = true
-
         nutLuyKe.tag = LoaiCheDoDoanhThu.luyKe.rawValue
-        nutLuyKe.setTitle("Lũy kế", for: .normal)
-        nutLuyKe.titleLabel?.font = .systemFont(ofSize: coLon ? 11.5 : 10.5, weight: .bold)
-        nutLuyKe.layer.cornerRadius = 6
+        nutLuyKe.setTitle("📊 Doanh thu Lũy kế", for: .normal)
+        nutLuyKe.titleLabel?.font = .systemFont(ofSize: coLon ? 14 : 13, weight: .bold)
+        nutLuyKe.layer.cornerRadius = 10
+        nutLuyKe.layer.borderWidth = 1
         nutLuyKe.addTarget(self, action: #selector(bamChonCheDo(_:)), for: .touchUpInside)
 
         nutRealtime.tag = LoaiCheDoDoanhThu.realtime.rawValue
-        nutRealtime.setTitle("Realtime", for: .normal)
-        nutRealtime.titleLabel?.font = .systemFont(ofSize: coLon ? 11.5 : 10.5, weight: .bold)
-        nutRealtime.layer.cornerRadius = 6
+        nutRealtime.setTitle("⚡ Doanh thu Realtime", for: .normal)
+        nutRealtime.titleLabel?.font = .systemFont(ofSize: coLon ? 14 : 13, weight: .bold)
+        nutRealtime.layer.cornerRadius = 10
+        nutRealtime.layer.borderWidth = 1
         nutRealtime.addTarget(self, action: #selector(bamChonCheDo(_:)), for: .touchUpInside)
 
-        let khungHaiNut = UIStackView(arrangedSubviews: [nutLuyKe, nutRealtime])
-        khungHaiNut.axis = .horizontal
-        khungHaiNut.spacing = 4
-        khungHaiNut.distribution = .fillEqually
-        khungHaiNut.backgroundColor = .systemGray6
-        khungHaiNut.layer.cornerRadius = 7
-        khungHaiNut.isLayoutMarginsRelativeArrangement = true
-        khungHaiNut.layoutMargins = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
-
-        nhanTienDoTrai.font = .systemFont(ofSize: coLon ? 11.5 : 10.5, weight: .bold)
-        nhanTienDoTrai.textColor = .secondaryLabel
-        nhanTienDoTrai.adjustsFontSizeToFitWidth = true
-        nhanTienDoTrai.minimumScaleFactor = 0.75
-
-        nhanTienDoPhai.font = .systemFont(ofSize: coLon ? 12 : 11, weight: .bold)
-        nhanTienDoPhai.textColor = .label
-        nhanTienDoPhai.textAlignment = .right
-
-        nenThanhTienDo.backgroundColor = .systemGray5
-        nenThanhTienDo.layer.cornerRadius = 2.5
-        nenThanhTienDo.clipsToBounds = true
-        nenThanhTienDo.isUserInteractionEnabled = false
-
-        mauThanhTienDo.backgroundColor = .systemBlue
-        mauThanhTienDo.layer.cornerRadius = 2.5
-        mauThanhTienDo.translatesAutoresizingMaskIntoConstraints = false
-        nenThanhTienDo.addSubview(mauThanhTienDo)
-
-        [khungHaiNut, nhanTienDoTrai, nhanTienDoPhai, nenThanhTienDo].forEach {
-            $0.translatesAutoresizingMaskIntoConstraints = false
-            khungTienDo.addSubview($0)
-        }
-
-        let rangBuocRong = mauThanhTienDo.widthAnchor.constraint(equalToConstant: 0)
-        rangBuocRongTienDo = rangBuocRong
-
-        NSLayoutConstraint.activate([
-            khungHaiNut.topAnchor.constraint(equalTo: khungTienDo.topAnchor, constant: 4),
-            khungHaiNut.leadingAnchor.constraint(equalTo: khungTienDo.leadingAnchor, constant: 8),
-            khungHaiNut.widthAnchor.constraint(equalToConstant: coLon ? 148 : 132),
-            khungHaiNut.heightAnchor.constraint(equalToConstant: coLon ? 22 : 20),
-
-            nhanTienDoTrai.centerYAnchor.constraint(equalTo: khungHaiNut.centerYAnchor),
-            nhanTienDoTrai.leadingAnchor.constraint(equalTo: khungHaiNut.trailingAnchor, constant: 8),
-            nhanTienDoTrai.trailingAnchor.constraint(lessThanOrEqualTo: nhanTienDoPhai.leadingAnchor, constant: -6),
-
-            nhanTienDoPhai.centerYAnchor.constraint(equalTo: khungHaiNut.centerYAnchor),
-            nhanTienDoPhai.trailingAnchor.constraint(equalTo: khungTienDo.trailingAnchor, constant: -10),
-
-            nenThanhTienDo.topAnchor.constraint(equalTo: khungHaiNut.bottomAnchor, constant: 4),
-            nenThanhTienDo.leadingAnchor.constraint(equalTo: khungTienDo.leadingAnchor, constant: 10),
-            nenThanhTienDo.trailingAnchor.constraint(equalTo: khungTienDo.trailingAnchor, constant: -10),
-            nenThanhTienDo.heightAnchor.constraint(equalToConstant: 4.5),
-            nenThanhTienDo.bottomAnchor.constraint(lessThanOrEqualTo: khungTienDo.bottomAnchor, constant: -4),
-
-            mauThanhTienDo.leadingAnchor.constraint(equalTo: nenThanhTienDo.leadingAnchor),
-            mauThanhTienDo.topAnchor.constraint(equalTo: nenThanhTienDo.topAnchor),
-            mauThanhTienDo.bottomAnchor.constraint(equalTo: nenThanhTienDo.bottomAnchor),
-            rangBuocRong
-        ])
+        let hangHaiNut = UIStackView(arrangedSubviews: [nutLuyKe, nutRealtime])
+        hangHaiNut.axis = .horizontal
+        hangHaiNut.spacing = 6
+        hangHaiNut.distribution = .fillEqually
 
         let tatCaThe = [theDTThuc, theDTQD, theTraGop, theLuotKhach, theHTQDDuKien, thePhanTramQD, theThiDuaHT, theTangGiam]
         tatCaThe.forEach { $0.isUserInteractionEnabled = false }
@@ -322,15 +255,15 @@ final class CumChiSoChinhView: UIControl {
         let tapLuoiThe = UITapGestureRecognizer(target: self, action: #selector(bamVaoLuoiThe))
         luoiThe.addGestureRecognizer(tapLuoiThe)
 
-        let nganChinh = UIStackView(arrangedSubviews: [khungTienDo, luoiThe])
+        let nganChinh = UIStackView(arrangedSubviews: [hangHaiNut, luoiThe])
         nganChinh.axis = .vertical
-        nganChinh.spacing = coLon ? 8 : 5
+        nganChinh.spacing = coLon ? 8 : 6
         nganChinh.isUserInteractionEnabled = true
         nganChinh.translatesAutoresizingMaskIntoConstraints = false
         addSubview(nganChinh)
 
         NSLayoutConstraint.activate([
-            khungTienDo.heightAnchor.constraint(equalToConstant: coLon ? 38 : 35),
+            hangHaiNut.heightAnchor.constraint(equalToConstant: coLon ? 38 : 34),
             nganChinh.topAnchor.constraint(equalTo: topAnchor),
             nganChinh.leadingAnchor.constraint(equalTo: leadingAnchor),
             nganChinh.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -360,31 +293,18 @@ final class CumChiSoChinhView: UIControl {
             if cheDoDoanhThu == loai {
                 nut.backgroundColor = .systemBlue
                 nut.setTitleColor(.white, for: .normal)
+                nut.layer.borderColor = UIColor.systemBlue.cgColor
             } else {
-                nut.backgroundColor = .clear
-                nut.setTitleColor(.secondaryLabel, for: .normal)
+                nut.backgroundColor = .secondarySystemGroupedBackground
+                nut.setTitleColor(.label, for: .normal)
+                nut.layer.borderColor = UIColor.separator.cgColor
             }
         }
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        khungTienDo.layoutIfNeeded()
-        rangBuocRongTienDo?.constant = nenThanhTienDo.bounds.width * tyLeTienDo
     }
 
     func capNhat(doanhThu dt: ThongTinDoanhThu, soNganhDat: Int, tongSoNganh: Int, ngay: Date = Date(), cheDo: LoaiCheDoDoanhThu = .luyKe) {
         self.cheDoDoanhThu = cheDo
         capNhatMauNutCheDo()
-
-        let lich = TienIchNgay.lich
-        let ngayMĐ = dt.soNgayDaQua > 0 ? dt.soNgayDaQua : max(1, lich.component(.day, from: ngay))
-        let tongNgayMĐ = dt.tongSoNgay > 0 ? dt.tongSoNgay : (lich.range(of: .day, in: .month, for: ngay)?.count ?? 30)
-        let ptTienDo = dt.phanTramTienDoThang > 0 ? dt.phanTramTienDoThang : (Double(ngayMĐ) / Double(max(1, tongNgayMĐ)) * 100.0)
-
-        nhanTienDoTrai.text = "Ngày \(ngayMĐ)/\(tongNgayMĐ)"
-        nhanTienDoPhai.text = ptTienDo.chuoiPhanTram
-        tyLeTienDo = CGFloat(min(1.0, max(0.02, ptTienDo / 100.0)))
 
         if !dt.coDuLieu {
             theDTThuc.capNhatNoiDung(chinh: "Chạm quét", phu: "TARGET: --", coLon: coLon)
@@ -745,7 +665,7 @@ final class BangThiDuaView: UIView, UICollectionViewDataSource, UICollectionView
         tieuDeTrong.textAlignment = .center
 
         let phuDeTrong = UILabel()
-        phuDeTrong.text = "Bấm vào từng ngành hàng sau khi quét để xem xếp hạng nhân viên & nhập ảnh thực hiện nhân viên.\nChia Target mặt hàng cho nhân viên trong Cài đặt (⚙️)."
+        phuDeTrong.text = "Chọn cặp ảnh cột TARGET và cột THỰC HIỆN để tự động ghép số liệu.\nBấm vào từng ngành hàng sau khi quét để xem xếp hạng nhân viên."
         phuDeTrong.font = .systemFont(ofSize: 12.5, weight: .regular)
         phuDeTrong.textColor = .secondaryLabel
         phuDeTrong.textAlignment = .center

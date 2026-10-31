@@ -238,7 +238,13 @@ final class DichVuDocAnh {
             return ([], [], capNhatLuc, thongTinDonVi)
         }
 
-        // Tìm tất cả các mốc tiêu đề khối chương trình dựa trên chữ "SỐ LƯỢNG" hoặc "DOANH THU" ở cột thứ 2 (0.22 <= x <= 0.55)
+        // KIỂU MỚI (2 cột: CHƯƠNG TRÌNH | TARGET hoặc CHƯƠNG TRÌNH | THỰC HIỆN)
+        let dsHaiCot = phanTichThiDuaHaiCot(phanTu: phanTu, watermark: maNhanVienWatermark)
+        if !dsHaiCot.isEmpty {
+            return (dsHaiCot, [], capNhatLuc, thongTinDonVi)
+        }
+
+        // KIỂU CŨ: Tìm tất cả các mốc tiêu đề khối chương trình dựa trên chữ "SỐ LƯỢNG" hoặc "DOANH THU" ở cột thứ 2 (0.22 <= x <= 0.55)
         let mocChiTieu = phanTu.filter { pt in
             let khongDau = boDau(pt.chu)
             let laChiTieu = khongDau.contains("SO LUONG") || khongDau.contains("DOANH THU")
@@ -294,6 +300,153 @@ final class DichVuDocAnh {
         }
 
         return (ketQua, [], capNhatLuc, thongTinDonVi)
+    }
+
+    // MARK: - Bước 2A.2: Bộ phân tích bố cục Thi Đua 2 cột ("CHƯƠNG TRÌNH | TARGET" và "CHƯƠNG TRÌNH | THỰC HIỆN")
+
+    private func phanTichThiDuaHaiCot(phanTu: [PhanTuVanBan], watermark: String?) -> [DongThiDua] {
+        // 1. Xác định tiêu đề bảng ("CHƯƠNG TRÌNH", "TARGET" / "ARGET", "THỰC HIỆN")
+        let vungHeader = phanTu.filter { $0.y > 0.08 && $0.y < 0.32 }
+        let mocChuongTrinh = vungHeader.first { boDau($0.chu).contains("CHUONG TRINH") }
+        let mocTarget = vungHeader.first { pt in
+            let u = boDau(pt.chu)
+            return pt.x > 0.55 && (u.contains("TARGET") || u.contains("ARGET"))
+        }
+        let mocThucHien = vungHeader.first { pt in
+            let u = boDau(pt.chu)
+            return pt.x > 0.55 && u.contains("THUC HIEN")
+        }
+
+        // Kiểm tra xem có các dòng chương trình dạng "T10 - ..." hoặc nhãn DT / SL không
+        let coDongChuongTrinh = phanTu.contains { pt in
+            pt.x < 0.55 && pt.y > 0.16 && pt.chu.range(of: "\bT\d{1,2}\s*[-–]", options: .regularExpression) != nil
+        }
+
+        guard mocChuongTrinh != nil || mocTarget != nil || mocThucHien != nil || coDongChuongTrinh else {
+            return []
+        }
+
+        let laCotTarget: Bool
+        if let mt = mocTarget, let mth = mocThucHien {
+            laCotTarget = mt.x >= mth.x
+        } else if mocTarget != nil {
+            laCotTarget = true
+        } else if mocThucHien != nil {
+            laCotTarget = false
+        } else {
+            // Mặc định nếu tiêu đề bị che khuất: kiểm tra xem có chữ ARGET/TARGET bất kỳ ở góc phải trên không
+            laCotTarget = phanTu.contains { $0.y < 0.30 && $0.x > 0.60 && boDau($0.chu).contains("ARGET") }
+        }
+
+        let yBatDau = max(
+            mocChuongTrinh?.y ?? 0.16,
+            max(mocTarget?.y ?? 0.16, mocThucHien?.y ?? 0.16)
+        ) + 0.015
+
+        // 2. Gom các phần tử bên trái (x < 0.74, y > yBatDau) thành từng dòng theo toạ độ Y
+        let phanTuTrai = phanTu.filter { pt in
+            guard pt.x < 0.74 && pt.y > yBatDau && pt.y < 0.97 else { return false }
+            let u = boDau(pt.chu)
+            if u.contains("CHUONG TRINH") || u.contains("CAN DICH") || u.contains("CHUA DAT") { return false }
+            if let wm = watermark, u.contains(wm) || u.contains("DUNG NGUYEN") { return false }
+            return true
+        }.sorted {
+            if abs($0.y - $1.y) < 0.012 { return $0.x < $1.x }
+            return $0.y < $1.y
+        }
+
+        struct DongGom {
+            var y: CGFloat
+            var cacPhanTu: [PhanTuVanBan]
+        }
+
+        var cacDongTrai: [DongGom] = []
+        for pt in phanTuTrai {
+            if let idx = cacDongTrai.indices.last, abs(pt.y - cacDongTrai[idx].y) < 0.018 {
+                cacDongTrai[idx].cacPhanTu.append(pt)
+            } else {
+                cacDongTrai.append(DongGom(y: pt.y, cacPhanTu: [pt]))
+            }
+        }
+
+        // Lọc ra các dòng tiêu đề chương trình (bỏ qua dòng tên siêu thị ĐML_ / ĐMX_ / TGDĐ_ và dòng chỉ có số)
+        var cacMocChuongTrinh: [(y: CGFloat, ten: String, loai: LoaiChiTieuThiDua)] = []
+        for dong in cacDongTrai {
+            let sapXepX = dong.cacPhanTu.sorted { $0.x < $1.x }
+            let chuoiGop = sapXepX.map(\.chu).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            let u = boDau(chuoiGop)
+
+            // Bỏ qua dòng đơn vị siêu thị (VD: "ĐML_QNG_QNG - 275 Quang Trung")
+            if chuoiGop.hasPrefix("ĐML_") || chuoiGop.hasPrefix("ĐMX_") || chuoiGop.hasPrefix("TGDĐ_") ||
+               u.hasPrefix("DML_") || u.hasPrefix("DMX_") || u.hasPrefix("TGDD_") ||
+               u.contains("QUANG TRUNG") {
+                continue
+            }
+            if laChuoiRac(chuoiGop, watermark: watermark) { continue }
+
+            // Kiểm tra xem dòng này có chữ cái tên chương trình không
+            let coChuCai = u.range(of: "[A-Z]{2,}", options: .regularExpression) != nil
+            guard coChuCai else { continue }
+
+            // Tách loại chỉ tiêu DT / SL ở cuối dòng hoặc trong badge riêng
+            var loai: LoaiChiTieuThiDua = .doanhThu
+            var tenSach = chuoiGop
+
+            if sapXepX.contains(where: { boDau($0.chu).trimmingCharacters(in: .whitespacesAndNewlines) == "SL" }) ||
+               u.range(of: "\bSL\s*$", options: .regularExpression) != nil {
+                loai = .soLuong
+            } else if sapXepX.contains(where: { boDau($0.chu).trimmingCharacters(in: .whitespacesAndNewlines) == "DT" }) ||
+                      u.range(of: "\bDT\s*$", options: .regularExpression) != nil {
+                loai = .doanhThu
+            }
+
+            // Loại bỏ ký hiệu dấu trừ "−" / "-" ở đầu dòng và nhãn "DT" / "SL" ở cuối tên chương trình
+            tenSach = tenSach
+                .replacingOccurrences(of: "^[\s\-–—−•◦○●⊕⊖]+", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\s+\b(DT|SL)\b\s*$", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\.\.\.|…", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard tenSach.count >= 2 else { continue }
+            cacMocChuongTrinh.append((y: dong.y, ten: tenSach, loai: loai))
+        }
+
+        guard !cacMocChuongTrinh.isEmpty else { return [] }
+
+        // 3. Với mỗi dòng chương trình, tìm con số nằm ở cột bên phải (x >= 0.68)
+        let phanTuSoPhai = phanTu.filter { pt in
+            guard pt.x >= 0.68 && pt.y > yBatDau - 0.01 && pt.y < 0.98 else { return false }
+            if let wm = watermark, pt.chu.contains(wm) { return false }
+            return chuyenChuoiThanhSoDoanhThu(pt.chu) != nil
+        }.sorted { $0.y < $1.y }
+
+        var ketQua: [DongThiDua] = []
+        for (i, moc) in cacMocChuongTrinh.enumerated() {
+            let yTren = moc.y - 0.022
+            let yDuoi: CGFloat = (i + 1 < cacMocChuongTrinh.count)
+                ? min(moc.y + 0.075, cacMocChuongTrinh[i + 1].y - 0.012)
+                : min(0.98, moc.y + 0.08)
+
+            let ungVienSo = phanTuSoPhai.filter { $0.y >= yTren && $0.y <= yDuoi }
+                .sorted { abs($0.y - moc.y) < abs($1.y - moc.y) }
+
+            guard let ptSo = ungVienSo.first,
+                  let giaTri = chuyenChuoiThanhSoDoanhThu(ptSo.chu) else {
+                continue
+            }
+
+            let dong = DongThiDua(
+                tenNganhHangGoc: moc.ten,
+                tenNganhHang: moc.ten,
+                loaiChiTieu: moc.loai,
+                thucHien: laCotTarget ? 0 : giaTri,
+                target: laCotTarget ? giaTri : 0
+            )
+            ketQua = KhoDuLieu.gopDanhSachThiDua(cu: ketQua, moi: [dong])
+        }
+
+        return ketQua
     }
 
     // MARK: - Bước 2B: Phân tích ảnh Thực hiện Nhân viên theo Ngành hàng
