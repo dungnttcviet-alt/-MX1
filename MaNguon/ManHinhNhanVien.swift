@@ -7,6 +7,7 @@ import PhotosUI
 final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UITableViewDelegate, PHPickerViewControllerDelegate {
     private var dong: DongThiDua
     private let ngay: Date
+    private let cheDo: LoaiCheDoDoanhThu
     private var danhSachXepHang: [DongXepHangNhanVienNganh] = []
 
     var khiCapNhatDuLieu: (() -> Void)?
@@ -23,9 +24,10 @@ final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UI
     private let nhanTienTrinh = UILabel()
     private let vongQuay = UIActivityIndicatorView(style: .large)
 
-    init(dong: DongThiDua, ngay: Date) {
+    init(dong: DongThiDua, ngay: Date, cheDo: LoaiCheDoDoanhThu = .luyKe) {
         self.dong = dong
         self.ngay = ngay
+        self.cheDo = cheDo
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -232,7 +234,10 @@ final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UI
 
     @objc private func napDuLieu() {
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngay)
-        if let capNhatDong = dl.danhSachThiDua.first(where: {
+        let dsTheoCheDo = dl.danhSachThiDua(theo: cheDo)
+        if let capNhatDong = dsTheoCheDo.first(where: {
+            $0.id == dong.id || KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHang) == KhoDuLieu.chuanHoaKhoaSoSanh(dong.tenNganhHang)
+        }) ?? dl.danhSachThiDua.first(where: {
             $0.id == dong.id || KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHang) == KhoDuLieu.chuanHoaKhoaSoSanh(dong.tenNganhHang)
         }) {
             dong = capNhatDong
@@ -279,8 +284,11 @@ final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UI
             guard r.itemProvider.canLoadObject(ofClass: UIImage.self) else { continue }
             nhom.enter()
             r.itemProvider.loadObject(ofClass: UIImage.self) { obj, _ in
-                if let img = obj as? UIImage { danhSach[i] = img }
-                nhom.leave()
+                let img = obj as? UIImage
+                DispatchQueue.main.async {
+                    if let img { danhSach[i] = img }
+                    nhom.leave()
+                }
             }
         }
 
@@ -1050,9 +1058,11 @@ final class BangNhanVienView: UIView, UITableViewDataSource, UITableViewDelegate
 
         let fmt = UIGraphicsImageRendererFormat()
         fmt.scale = 2.0
-        return UIGraphicsImageRenderer(size: khungBaoCao.bounds.size, format: fmt).image { ctx in
+        let anh = UIGraphicsImageRenderer(size: khungBaoCao.bounds.size, format: fmt).image { ctx in
             khungBaoCao.layer.render(in: ctx.cgContext)
         }
+        bang.reloadData()
+        return anh
     }
 }
 
@@ -1640,8 +1650,10 @@ final class ManHinhChiTietNhanVien: UIViewController, UITableViewDataSource, UIT
 
         let fmt = UIGraphicsImageRendererFormat()
         fmt.scale = 2.0
-        return UIGraphicsImageRenderer(size: khungBaoCao.bounds.size, format: fmt).image { ctx in
+        let anh = UIGraphicsImageRenderer(size: khungBaoCao.bounds.size, format: fmt).image { ctx in
             khungBaoCao.layer.render(in: ctx.cgContext)
         }
+        bang.reloadData()
+        return anh
     }
 }

@@ -609,8 +609,10 @@ final class DichVuDocAnh {
             guard tenSach.count >= 2 else { continue }
 
             // 5. Lấy số THỰC HIỆN (bên trái thẻ) và TARGET / TARGET NGÀY (bên phải thẻ)
+            // Lưu ý: Thẻ Realtime chỉ có 1 dòng % (% HT NGÀY ở trên), dòng số Thực hiện & Target ngày nằm sát đáy thẻ
+            let yGioiHanDuoiSo: CGFloat = (cacPhanTuPhanTramTrai.count >= 2) ? (yBotPct - 0.010) : yDuoiThe
             let cacYMocTrongThe = trongThe.compactMap { pt -> CGFloat? in
-                guard pt.y > yBigPct + 0.015 && pt.y < yBotPct - 0.01 else { return nil }
+                guard pt.y > yBigPct + 0.015 && pt.y < yGioiHanDuoiSo else { return nil }
                 let u = boDau(pt.chu)
                 if u.contains("THUC HIEN") || u.hasPrefix("TARGET") || u == "THUC" || u == "HIEN" {
                     return pt.y
@@ -620,7 +622,7 @@ final class DichVuDocAnh {
             let yBatDauSo: CGFloat = (cacYMocTrongThe.min() ?? (yBigPct + (yBotPct - yBigPct) * 0.40)) + 0.003
 
             let vungSoTHTG = trongThe.filter { pt in
-                guard pt.y > yBatDauSo && pt.y < yBotPct - 0.010 else { return false }
+                guard pt.y > yBatDauSo && pt.y < yGioiHanDuoiSo else { return false }
                 guard !pt.chu.contains("%") else { return false }
                 let u = boDau(pt.chu)
                 if u.contains("THUC") || u.contains("HIEN") || u.contains("TARGET") ||

@@ -7,7 +7,7 @@
    - Đăng nhập / Tạo tài khoản mới và tự động đồng bộ hai chiều dữ liệu cài đặt, danh sách nhân viên, chia target và dữ liệu báo cáo các ngày với `duongnt.io.vn/dmx` (`/api/dmx/dong-bo`).
 2. **Đọc ảnh trực tiếp trên thiết bị bằng Apple Vision OCR (Offline 100%, không dùng AI bên ngoài)**:
    - **Ảnh Doanh thu hợp nhất (DT thực & DT quy đổi)**: Đọc tự động thanh tiến độ tháng và 8 thẻ chỉ số chính (`Doanh thu thực`, `Doanh thu QĐ`, `% Trả góp`, `Lượt khách`, `% HT QĐ dự kiến`, `% Quy đổi`, `Thi đua hoàn thành`, `Tăng/Giảm cùng kỳ`).
-   - **Ảnh Thi đua siêu thị**: Đọc tự động các khối chương trình thi đua (`SL` / `DT`), khử trùng lặp khi chụp cuộn trang và áp dụng bộ lọc cụm từ trong Cài đặt.
+   - **Ảnh Thi đua siêu thị (Tách riêng Lũy kế & Realtime)**: Upload, lưu trữ, chỉnh sửa và xuất báo cáo bảng Thi đua **Lũy kế** và **Realtime** hoàn toàn độc lập nhau; đọc tự động các khối chương trình thi đua (`SL` / `DT`), khử trùng lặp khi chụp cuộn trang và áp dụng bộ lọc cụm từ trong Cài đặt.
    - **Ảnh Thực hiện Nhân viên theo Ngành hàng**: Bấm vào từng ngành hàng trong bảng Thi đua để xem xếp hạng nhân viên, nhập/sửa tay thực hiện, quét ảnh thực hiện nhân viên và xuất ảnh bảng xếp hạng ngành hàng.
    - **Ảnh Doanh thu hợp nhất theo Nhân viên**: Hỗ trợ cả bảng lưới 5 cột và bảng rộng 11 cột trong mục **Nhân viên**.
 3. **Quản lý Nhân viên & Chia Target Mặt hàng**:

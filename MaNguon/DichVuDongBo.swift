@@ -254,25 +254,51 @@ final class DichVuDongBo {
         damBaoUserId { [weak self] userId in
             guard let self else { return }
             let nhom = DispatchGroup()
+            let khoaGop = NSLock()
             var caiDatGop: CaiDatDMX?
             var cacNgayGop: [String: DuLieuNgayDMX] = [:]
+
+            func gopAnToan(caiDat: CaiDatDMX?, cacNgay: [String: DuLieuNgayDMX]?) {
+                khoaGop.lock()
+                defer { khoaGop.unlock() }
+                if let cd = caiDat { caiDatGop = cd }
+                if let ngay = cacNgay {
+                    for (k, v) in ngay {
+                        if var cu = cacNgayGop[k] {
+                            if cu.danhSachThiDua.isEmpty && !v.danhSachThiDua.isEmpty {
+                                cu.danhSachThiDua = v.danhSachThiDua
+                            }
+                            if cu.danhSachThiDuaRealtime.isEmpty && !v.danhSachThiDuaRealtime.isEmpty {
+                                cu.danhSachThiDuaRealtime = v.danhSachThiDuaRealtime
+                            }
+                            if !v.danhSachThiDua.isEmpty && !v.danhSachThiDuaRealtime.isEmpty {
+                                cu = v
+                            } else {
+                                var moi = v
+                                if moi.danhSachThiDua.isEmpty { moi.danhSachThiDua = cu.danhSachThiDua }
+                                if moi.danhSachThiDuaRealtime.isEmpty { moi.danhSachThiDuaRealtime = cu.danhSachThiDuaRealtime }
+                                cu = moi
+                            }
+                            cacNgayGop[k] = cu
+                        } else {
+                            cacNgayGop[k] = v
+                        }
+                    }
+                }
+            }
 
             // Nguồn 1: Đọc file JSON từ Supabase Storage (dmx-du-lieu/{userId}.json) - nơi Web API lưu
             if let uid = userId, !uid.isEmpty {
                 nhom.enter()
                 self.docFileStorageSupabase(userId: uid) { cloud in
-                    if let cd = cloud?.caiDat { caiDatGop = cd }
-                    if let ngay = cloud?.cacNgay {
-                        for (k, v) in ngay { cacNgayGop[k] = v }
-                    }
+                    gopAnToan(caiDat: cloud?.caiDat, cacNgay: cloud?.cacNgay)
                     nhom.leave()
                 }
 
                 // Nguồn 2: Đọc từ bảng SQL dmx_ho_so & dmx_du_lieu_ngay (nơi trình duyệt Web lưu trực tiếp)
                 nhom.enter()
                 self.docBangSQLSupabase(userId: uid) { cdSQL, ngaySQL in
-                    if let cdSQL { caiDatGop = cdSQL }
-                    for (k, v) in ngaySQL { cacNgayGop[k] = v }
+                    gopAnToan(caiDat: cdSQL, cacNgay: ngaySQL)
                     nhom.leave()
                 }
             }
@@ -281,17 +307,18 @@ final class DichVuDongBo {
             nhom.enter()
             self.guiWeb(path: "/api/dmx/dong-bo", method: "GET", bodyData: nil, canDangNhap: true) { (kq: Result<DuLieuDamMay, Error>) in
                 if case .success(let cloud) = kq {
-                    if let cd = cloud.caiDat { caiDatGop = cd }
-                    if let ngay = cloud.cacNgay {
-                        for (k, v) in ngay { cacNgayGop[k] = v }
-                    }
+                    gopAnToan(caiDat: cloud.caiDat, cacNgay: cloud.cacNgay)
                 }
                 nhom.leave()
             }
 
             nhom.notify(queue: .main) {
-                if caiDatGop != nil || !cacNgayGop.isEmpty {
-                    KhoDuLieu.dungChung.nhapDuLieuDamMay(caiDat: caiDatGop, cacNgay: cacNgayGop)
+                khoaGop.lock()
+                let cdCuoi = caiDatGop
+                let ngayCuoi = cacNgayGop
+                khoaGop.unlock()
+                if cdCuoi != nil || !ngayCuoi.isEmpty {
+                    KhoDuLieu.dungChung.nhapDuLieuDamMay(caiDat: cdCuoi, cacNgay: ngayCuoi)
                     NotificationCenter.default.post(name: .duLieuDMXDaDongBo, object: nil)
                 }
                 hoanTat?(.success(()))
@@ -370,10 +397,26 @@ final class DichVuDongBo {
     }
 
     private func damBaoUserId(hoanTat: @escaping (String?) -> Void) {
+        let bayGio = Int(Date().timeIntervalSince1970)
+        if let exp = phien?.expiresAt, exp > 0, exp <= bayGio + 60 {
+            lamMoiPhien { [weak self] _ in
+                guard let self else { hoanTat(nil); return }
+                if let uid = self.phien?.userId, !uid.isEmpty {
+                    hoanTat(uid)
+                } else {
+                    self.truyVanUserIdTuSupabase(hoanTat: hoanTat)
+                }
+            }
+            return
+        }
         if let uid = phien?.userId, !uid.isEmpty {
             hoanTat(uid)
             return
         }
+        truyVanUserIdTuSupabase(hoanTat: hoanTat)
+    }
+
+    private func truyVanUserIdTuSupabase(hoanTat: @escaping (String?) -> Void) {
         guard let token = phien?.accessToken else {
             hoanTat(nil)
             return

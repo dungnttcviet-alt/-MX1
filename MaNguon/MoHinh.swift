@@ -579,6 +579,7 @@ struct DuLieuNgayDMX: Codable {
     var doanhThu: ThongTinDoanhThu
     var doanhThuRealtime: ThongTinDoanhThu = ThongTinDoanhThu()
     var danhSachThiDua: [DongThiDua]
+    var danhSachThiDuaRealtime: [DongThiDua] = []
     var thiDuaNhanVien: [String: [String: Double]] = [:]
     var doanhThuNhanVien: [DoanhThuNhanVienItem] = []
 
@@ -589,6 +590,7 @@ struct DuLieuNgayDMX: Codable {
         doanhThu: ThongTinDoanhThu,
         doanhThuRealtime: ThongTinDoanhThu = ThongTinDoanhThu(),
         danhSachThiDua: [DongThiDua],
+        danhSachThiDuaRealtime: [DongThiDua] = [],
         thiDuaNhanVien: [String: [String: Double]] = [:],
         doanhThuNhanVien: [DoanhThuNhanVienItem] = []
     ) {
@@ -598,6 +600,7 @@ struct DuLieuNgayDMX: Codable {
         self.doanhThu = doanhThu
         self.doanhThuRealtime = doanhThuRealtime
         self.danhSachThiDua = danhSachThiDua
+        self.danhSachThiDuaRealtime = danhSachThiDuaRealtime
         self.thiDuaNhanVien = thiDuaNhanVien
         self.doanhThuNhanVien = doanhThuNhanVien
     }
@@ -610,8 +613,23 @@ struct DuLieuNgayDMX: Codable {
         doanhThu = (try? c.decode(ThongTinDoanhThu.self, forKey: .doanhThu)) ?? ThongTinDoanhThu()
         doanhThuRealtime = (try? c.decode(ThongTinDoanhThu.self, forKey: .doanhThuRealtime)) ?? ThongTinDoanhThu()
         danhSachThiDua = (try? c.decode([DongThiDua].self, forKey: .danhSachThiDua)) ?? []
+        danhSachThiDuaRealtime = (try? c.decode([DongThiDua].self, forKey: .danhSachThiDuaRealtime)) ?? []
         thiDuaNhanVien = (try? c.decode([String: [String: Double]].self, forKey: .thiDuaNhanVien)) ?? [:]
         doanhThuNhanVien = (try? c.decode([DoanhThuNhanVienItem].self, forKey: .doanhThuNhanVien)) ?? []
+    }
+
+    func danhSachThiDua(theo cheDo: LoaiCheDoDoanhThu) -> [DongThiDua] {
+        switch cheDo {
+        case .luyKe: return danhSachThiDua
+        case .realtime: return danhSachThiDuaRealtime
+        }
+    }
+
+    mutating func ganDanhSachThiDua(_ ds: [DongThiDua], theo cheDo: LoaiCheDoDoanhThu) {
+        switch cheDo {
+        case .luyKe: danhSachThiDua = ds
+        case .realtime: danhSachThiDuaRealtime = ds
+        }
     }
 }
 
@@ -747,14 +765,22 @@ final class KhoDuLieu {
         let tienTo = String(khoa.prefix(7))
         let luyKeThang = doanhThuLuyKeThang(cho: ngay)
 
-        // Tìm target gần nhất trong tháng nếu ngày hiện tại có mặt hàng nhưng target đang = 0
+        // Tìm target Lũy kế & Realtime gần nhất trong tháng (tách biệt hoàn toàn giữa Lũy kế và Realtime)
         var targetTheoKhoaTrongThang: [String: Double] = [:]
-        for (kNgay, dlNgay) in cacNgay where kNgay.hasPrefix(tienTo) && kNgay <= khoa {
+        var targetRealtimeTheoKhoaTrongThang: [String: Double] = [:]
+        for kNgay in cacNgay.keys.filter({ $0.hasPrefix(tienTo) && $0 <= khoa }).sorted() {
+            guard let dlNgay = cacNgay[kNgay] else { continue }
             for d in dlNgay.danhSachThiDua where d.target > 0 {
                 let k1 = Self.chuanHoaKhoaSoSanh(Self.apDungLocTuCaiDat(d.tenNganhHangGoc))
                 let k2 = Self.chuanHoaKhoaSoSanh(d.tenNganhHangGoc)
                 if !k1.isEmpty { targetTheoKhoaTrongThang[k1] = d.target }
                 if !k2.isEmpty { targetTheoKhoaTrongThang[k2] = d.target }
+            }
+            for d in dlNgay.danhSachThiDuaRealtime where d.target > 0 {
+                let k1 = Self.chuanHoaKhoaSoSanh(Self.apDungLocTuCaiDat(d.tenNganhHangGoc))
+                let k2 = Self.chuanHoaKhoaSoSanh(d.tenNganhHangGoc)
+                if !k1.isEmpty { targetRealtimeTheoKhoaTrongThang[k1] = d.target }
+                if !k2.isEmpty { targetRealtimeTheoKhoaTrongThang[k2] = d.target }
             }
         }
 
@@ -774,6 +800,19 @@ final class KhoDuLieu {
                 }
             }
             coSan.danhSachThiDua = Self.gopDanhSachThiDua(cu: [], moi: coSan.danhSachThiDua)
+
+            for i in coSan.danhSachThiDuaRealtime.indices {
+                let goc = coSan.danhSachThiDuaRealtime[i].tenNganhHangGoc
+                coSan.danhSachThiDuaRealtime[i].tenNganhHang = KhoDuLieu.apDungLocTuCaiDat(goc)
+                if coSan.danhSachThiDuaRealtime[i].target <= 0 {
+                    let k1 = Self.chuanHoaKhoaSoSanh(coSan.danhSachThiDuaRealtime[i].tenNganhHang)
+                    let k2 = Self.chuanHoaKhoaSoSanh(goc)
+                    if let t = targetRealtimeTheoKhoaTrongThang[k1] ?? targetRealtimeTheoKhoaTrongThang[k2], t > 0 {
+                        coSan.danhSachThiDuaRealtime[i].target = t
+                    }
+                }
+            }
+            coSan.danhSachThiDuaRealtime = Self.gopDanhSachThiDua(cu: [], moi: coSan.danhSachThiDuaRealtime)
             return coSan
         }
         return DuLieuNgayDMX(
@@ -781,7 +820,8 @@ final class KhoDuLieu {
             capNhatLuc: "",
             thongTinDonVi: "",
             doanhThu: luyKeThang,
-            danhSachThiDua: []
+            danhSachThiDua: [],
+            danhSachThiDuaRealtime: []
         )
     }
 
@@ -793,6 +833,12 @@ final class KhoDuLieu {
             banLuu.danhSachThiDua[i].tenNganhHang = Self.apDungLocTuCaiDat(goc)
         }
         banLuu.danhSachThiDua = Self.gopDanhSachThiDua(cu: [], moi: banLuu.danhSachThiDua)
+
+        for i in banLuu.danhSachThiDuaRealtime.indices {
+            let goc = banLuu.danhSachThiDuaRealtime[i].tenNganhHangGoc
+            banLuu.danhSachThiDuaRealtime[i].tenNganhHang = Self.apDungLocTuCaiDat(goc)
+        }
+        banLuu.danhSachThiDuaRealtime = Self.gopDanhSachThiDua(cu: [], moi: banLuu.danhSachThiDuaRealtime)
 
         // Doanh thu Lũy kế là cố định của tháng: khi người dùng nhập vào mỗi ngày sẽ thay thế cho ngày hôm trước trong cùng tháng
         if banLuu.doanhThu.coDuLieu {
@@ -823,6 +869,12 @@ final class KhoDuLieu {
                 dl.danhSachThiDua[i].tenNganhHang = KhoDuLieu.apDungLocTuCaiDat(goc)
             }
             dl.danhSachThiDua = Self.gopDanhSachThiDua(cu: [], moi: dl.danhSachThiDua)
+
+            for i in dl.danhSachThiDuaRealtime.indices {
+                let goc = dl.danhSachThiDuaRealtime[i].tenNganhHangGoc
+                dl.danhSachThiDuaRealtime[i].tenNganhHang = KhoDuLieu.apDungLocTuCaiDat(goc)
+            }
+            dl.danhSachThiDuaRealtime = Self.gopDanhSachThiDua(cu: [], moi: dl.danhSachThiDuaRealtime)
             cacNgay[khoa] = dl
         }
         ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
@@ -837,6 +889,13 @@ final class KhoDuLieu {
                 let goc = duLieu.danhSachThiDua[i].tenNganhHangGoc
                 duLieu.danhSachThiDua[i].tenNganhHang = KhoDuLieu.apDungLocTuCaiDat(goc)
             }
+            duLieu.danhSachThiDua = Self.gopDanhSachThiDua(cu: [], moi: duLieu.danhSachThiDua)
+
+            for i in duLieu.danhSachThiDuaRealtime.indices {
+                let goc = duLieu.danhSachThiDuaRealtime[i].tenNganhHangGoc
+                duLieu.danhSachThiDuaRealtime[i].tenNganhHang = KhoDuLieu.apDungLocTuCaiDat(goc)
+            }
+            duLieu.danhSachThiDuaRealtime = Self.gopDanhSachThiDua(cu: [], moi: duLieu.danhSachThiDuaRealtime)
             cacNgay[khoa] = duLieu
         }
         ThuMucDuLieu.dungChung.ghi(caiDat, vao: ThuMucDuLieu.dungChung.tepCaiDat)
@@ -850,7 +909,7 @@ final class KhoDuLieu {
         ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
     }
 
-    /// Danh sách mặt hàng đồng bộ trực tiếp với bảng Thi đua của ngày đang chọn (hoặc ngày gần nhất trong tháng nếu ngày đang chọn chưa quét)
+    /// Danh sách mặt hàng đồng bộ trực tiếp với bảng Thi đua Lũy kế của ngày đang chọn (hoặc ngày gần nhất trong tháng, dự phòng sang Realtime nếu chưa quét Lũy kế)
     func danhSachMatHangThang(den ngay: Date) -> [DongThiDua] {
         let dlNgay = duLieu(cho: ngay)
         if !dlNgay.danhSachThiDua.isEmpty {
@@ -869,6 +928,9 @@ final class KhoDuLieu {
                 return Self.gopDanhSachThiDua(cu: [], moi: ds)
             }
         }
+        if !dlNgay.danhSachThiDuaRealtime.isEmpty {
+            return dlNgay.danhSachThiDuaRealtime
+        }
         return []
     }
 
@@ -885,23 +947,25 @@ final class KhoDuLieu {
     }
 
     /// Đồng bộ cập nhật Target & ĐVT (DT/SL) của 1 ngành hàng từ màn hình Chia Target (Cài đặt) sang Bảng Thi Đua
-    func capNhatTargetNganhHang(dongGoc: DongThiDua, targetMoi: Double, loaiChiTieuMoi: LoaiChiTieuThiDua? = nil, cho ngay: Date) {
+    func capNhatTargetNganhHang(dongGoc: DongThiDua, targetMoi: Double, loaiChiTieuMoi: LoaiChiTieuThiDua? = nil, cho ngay: Date, cheDo: LoaiCheDoDoanhThu = .luyKe) {
         let k1 = Self.chuanHoaKhoaSoSanh(dongGoc.tenNganhHang)
         let k2 = Self.chuanHoaKhoaSoSanh(dongGoc.tenNganhHangGoc)
         var dl = duLieu(cho: ngay)
+        var ds = dl.danhSachThiDua(theo: cheDo)
         var daCapNhat = false
-        for i in dl.danhSachThiDua.indices {
-            let dk1 = Self.chuanHoaKhoaSoSanh(dl.danhSachThiDua[i].tenNganhHang)
-            let dk2 = Self.chuanHoaKhoaSoSanh(dl.danhSachThiDua[i].tenNganhHangGoc)
-            if dl.danhSachThiDua[i].id == dongGoc.id || dk1 == k1 || dk2 == k2 {
-                dl.danhSachThiDua[i].target = targetMoi
+        for i in ds.indices {
+            let dk1 = Self.chuanHoaKhoaSoSanh(ds[i].tenNganhHang)
+            let dk2 = Self.chuanHoaKhoaSoSanh(ds[i].tenNganhHangGoc)
+            if ds[i].id == dongGoc.id || dk1 == k1 || dk2 == k2 {
+                ds[i].target = targetMoi
                 if let loai = loaiChiTieuMoi {
-                    dl.danhSachThiDua[i].loaiChiTieu = loai
+                    ds[i].loaiChiTieu = loai
                 }
                 daCapNhat = true
             }
         }
         if daCapNhat {
+            dl.ganDanhSachThiDua(ds, theo: cheDo)
             luu(dl)
         } else {
             // Nếu ngày đang chọn chưa có danh sách, cập nhật vào ngày gần nhất trong tháng
@@ -909,17 +973,20 @@ final class KhoDuLieu {
             let tienTo = String(khoaDen.prefix(7))
             let cacKhoa = cacNgay.keys.filter { $0.hasPrefix(tienTo) && $0 <= khoaDen }.sorted(by: >)
             for khoa in cacKhoa {
-                guard var dlCu = cacNgay[khoa], !dlCu.danhSachThiDua.isEmpty else { continue }
-                for i in dlCu.danhSachThiDua.indices {
-                    let dk1 = Self.chuanHoaKhoaSoSanh(Self.apDungLocTuCaiDat(dlCu.danhSachThiDua[i].tenNganhHangGoc))
-                    let dk2 = Self.chuanHoaKhoaSoSanh(dlCu.danhSachThiDua[i].tenNganhHangGoc)
+                guard var dlCu = cacNgay[khoa] else { continue }
+                var dsCu = dlCu.danhSachThiDua(theo: cheDo)
+                guard !dsCu.isEmpty else { continue }
+                for i in dsCu.indices {
+                    let dk1 = Self.chuanHoaKhoaSoSanh(Self.apDungLocTuCaiDat(dsCu[i].tenNganhHangGoc))
+                    let dk2 = Self.chuanHoaKhoaSoSanh(dsCu[i].tenNganhHangGoc)
                     if dk1 == k1 || dk2 == k2 {
-                        dlCu.danhSachThiDua[i].target = targetMoi
+                        dsCu[i].target = targetMoi
                         if let loai = loaiChiTieuMoi {
-                            dlCu.danhSachThiDua[i].loaiChiTieu = loai
+                            dsCu[i].loaiChiTieu = loai
                         }
                     }
                 }
+                dlCu.ganDanhSachThiDua(dsCu, theo: cheDo)
                 luu(dlCu)
                 break
             }
