@@ -1137,10 +1137,14 @@ final class KhoDuLieu {
         var ketQua = cu
         for var dongMoi in moi {
             dongMoi.tenNganhHang = apDungLocTuCaiDat(dongMoi.tenNganhHangGoc)
-            let khoaMoi = chuanHoaKhoaSoSanh(dongMoi.tenNganhHang)
+            let khoaGocMoi = chuanHoaKhoaSoSanh(dongMoi.tenNganhHangGoc)
+            let khoaMoi = khoaGocMoi.isEmpty ? chuanHoaKhoaSoSanh(dongMoi.tenNganhHang) : khoaGocMoi
             guard !khoaMoi.isEmpty else { continue }
 
-            if let viTri = ketQua.firstIndex(where: { chuanHoaKhoaSoSanh($0.tenNganhHang) == khoaMoi }) {
+            if let viTri = ketQua.firstIndex(where: {
+                let kg = chuanHoaKhoaSoSanh($0.tenNganhHangGoc)
+                return (kg.isEmpty ? chuanHoaKhoaSoSanh($0.tenNganhHang) : kg) == khoaMoi
+            }) {
                 var dongCu = ketQua[viTri]
                 // Giữ tên đầy đủ hơn nếu một trong hai ảnh bị cắt chữ "..."
                 if dongMoi.tenNganhHangGoc.count > dongCu.tenNganhHangGoc.count && !dongMoi.tenNganhHangGoc.hasSuffix("...") {
