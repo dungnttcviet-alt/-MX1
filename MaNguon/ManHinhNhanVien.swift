@@ -958,6 +958,102 @@ final class BangNhanVienView: UIView, UITableViewDataSource, UITableViewDelegate
         guard indexPath.row < danhSach.count else { return }
         khiChonNhanVien?(danhSach[indexPath.row])
     }
+
+    // MARK: - Xuất Ảnh Bảng Xếp Hạng Tổng Hợp Nhân Viên
+
+    func taoAnhBaoCaoNhanVien(ngay: Date, thongTinDonVi: String = "", capNhatLuc: String = "") -> UIImage? {
+        let ds = danhSach.isEmpty ? KhoDuLieu.dungChung.tongHopNhanVien(den: ngay, sapXep: kieuSapXep) : danhSach
+        let dl = KhoDuLieu.dungChung.duLieu(cho: ngay)
+        let donVi = !thongTinDonVi.isEmpty ? thongTinDonVi : (dl.thongTinDonVi.isEmpty ? "ĐIỆN MÁY XANH" : dl.thongTinDonVi)
+        let ngayStr = TienIchNgay.hienThiNgay.string(from: ngay)
+        let soMonThang = KhoDuLieu.dungChung.danhSachMatHangThang(den: ngay).count
+
+        let tongDTQD = ds.reduce(0.0) { $0 + $1.doanhThuQD }
+        let tongDon = ds.reduce(0.0) { $0 + $1.soLuongDon }
+        let tongVay = ds.reduce(0.0) { $0 + $1.dtQDKhoanVay }
+        let tbHT = ds.isEmpty ? 0.0 : (ds.reduce(0.0) { $0 + $1.phanTramHTTB } / Double(ds.count))
+
+        let le: CGFloat = 18
+        let rongBang = tongChieuRongBang
+        let rongAnh = rongBang + le * 2
+        let caoHeader: CGFloat = 54
+        let caoTomTat: CGFloat = 34
+        let caoTieuDeCot: CGFloat = 40
+        let caoDong: CGFloat = 52
+        let soDong = max(1, ds.count)
+        let caoBang = caoTieuDeCot + CGFloat(soDong) * caoDong
+        let caoAnh = le * 2 + caoHeader + 8 + caoTomTat + 10 + caoBang
+
+        let khungBaoCao = UIView(frame: CGRect(x: 0, y: 0, width: rongAnh, height: caoAnh))
+        khungBaoCao.backgroundColor = .white
+        khungBaoCao.overrideUserInterfaceStyle = .light
+
+        let lbPhu = UILabel(frame: CGRect(x: le, y: le, width: rongBang, height: 18))
+        lbPhu.text = "\(donVi)  •  Ngày \(ngayStr)\(capNhatLuc.isEmpty ? "" : "  •  Cập nhật: \(capNhatLuc)")"
+        lbPhu.font = .systemFont(ofSize: 12, weight: .bold)
+        lbPhu.textColor = .darkGray
+        khungBaoCao.addSubview(lbPhu)
+
+        let lbChinh = UILabel(frame: CGRect(x: le, y: le + 20, width: rongBang, height: 28))
+        lbChinh.text = "🏆 BẢNG XẾP HẠNG TỔNG HỢP NHÂN VIÊN (\(ds.count) NV • \(soMonThang) MÔN)"
+        lbChinh.font = .systemFont(ofSize: 18.5, weight: .heavy)
+        lbChinh.textColor = .black
+        khungBaoCao.addSubview(lbChinh)
+
+        var y = le + caoHeader + 8
+
+        let hopTomTat = UIView(frame: CGRect(x: le, y: y, width: rongBang, height: caoTomTat))
+        hopTomTat.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.08)
+        hopTomTat.layer.cornerRadius = 8
+        let lbTomTat = UILabel(frame: CGRect(x: 12, y: 0, width: rongBang - 24, height: caoTomTat))
+        lbTomTat.text = "Tổng DT Quy đổi: \(tongDTQD.chuoiSoGonVN)   •   Tổng đơn: \(tongDon.chuoiSoNguyenVN)   •   DT Khoản vay: \(tongVay.chuoiSoGonVN)   •   % HT TB: \(String(format: "%.1f%%", tbHT))"
+        lbTomTat.font = .systemFont(ofSize: 12.5, weight: .bold)
+        lbTomTat.textColor = .systemBlue
+        hopTomTat.addSubview(lbTomTat)
+        khungBaoCao.addSubview(hopTomTat)
+
+        y += caoTomTat + 10
+
+        let khungBang = UIView(frame: CGRect(x: le, y: y, width: rongBang, height: caoBang))
+        khungBang.layer.borderWidth = 1
+        khungBang.layer.borderColor = UIColor.systemGray4.cgColor
+        khungBang.layer.cornerRadius = 8
+        khungBang.clipsToBounds = true
+        khungBaoCao.addSubview(khungBang)
+
+        if let header = self.tableView(bang, viewForHeaderInSection: 0) {
+            header.frame = CGRect(x: 0, y: 0, width: rongBang, height: caoTieuDeCot)
+            khungBang.addSubview(header)
+        }
+
+        if ds.isEmpty {
+            let lbTrong = UILabel(frame: CGRect(x: 0, y: caoTieuDeCot, width: rongBang, height: caoDong))
+            lbTrong.text = "Chưa có dữ liệu nhân viên."
+            lbTrong.font = .systemFont(ofSize: 13, weight: .medium)
+            lbTrong.textColor = .gray
+            lbTrong.textAlignment = .center
+            khungBang.addSubview(lbTrong)
+        } else {
+            let cu = self.danhSach
+            self.danhSach = ds
+            for i in 0..<ds.count {
+                let cell = self.tableView(bang, cellForRowAt: IndexPath(row: i, section: 0))
+                let vDong = cell.contentView
+                vDong.frame = CGRect(x: 0, y: caoTieuDeCot + CGFloat(i) * caoDong, width: rongBang, height: caoDong)
+                let vach = UIView(frame: CGRect(x: 0, y: caoDong - 0.5, width: rongBang, height: 0.5))
+                vach.backgroundColor = .systemGray4
+                vDong.addSubview(vach)
+                khungBang.addSubview(vDong)
+            }
+            self.danhSach = cu
+        }
+
+        let fmt = UIGraphicsImageRendererFormat()
+        fmt.scale = 2.0
+        return UIGraphicsImageRenderer(size: khungBaoCao.bounds.size, format: fmt).image { ctx in
+            khungBaoCao.layer.render(in: ctx.cgContext)
+        }
+    }
 }
 
 // MARK: - 3. Màn hình Chi tiết Sức khoẻ Cá nhân Nhân viên
@@ -1302,7 +1398,13 @@ final class ManHinhChiTietNhanVien: UIViewController, UITableViewDataSource, UIT
         present(vc, animated: true)
     }
 
-    private func taoAnhSucKhoeNhanVien() -> UIImage? {
+    static func taoAnhSucKhoe(cho tongHop: TongHopNhanVien, ngay: Date) -> UIImage? {
+        let vc = ManHinhChiTietNhanVien(tongHop, ngay: ngay)
+        vc.loadViewIfNeeded()
+        return vc.taoAnhSucKhoeNhanVien()
+    }
+
+    func taoAnhSucKhoeNhanVien() -> UIImage? {
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngay)
         let dt = dl.doanhThu
         let lich = TienIchNgay.lich
