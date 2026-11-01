@@ -863,7 +863,7 @@ final class DichVuDocAnh {
 
     /// Làm sạch tên chương trình: bỏ dấu trừ đầu dòng, bỏ chữ DT/SL hoặc dấu | thừa ở cuối dòng
     private func lamSachTenChuongTrinh(_ chuoi: String) -> String {
-        var s = chuoi
+        let s = chuoi
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "^[\\s\\-–—−•◦○●⊕⊖|¦/\\\\,:;]+", with: "", options: .regularExpression)
             .replacingOccurrences(of: "(?:\\s+|\\s*[\\|¦]\\s*)\\b(DT|SL|5L|0T)\\b\\s*$", with: "", options: .regularExpression)

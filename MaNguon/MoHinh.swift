@@ -327,6 +327,15 @@ struct ThongTinDoanhThu: Codable, Hashable {
         return ((doanhThuQuyDoi - doanhThuThuc) / doanhThuThuc) * 100.0
     }
 
+    /// % Hoàn thành Doanh thu thực
+    var phanTramHTThucHienThi: Double {
+        if phanTramHTThuc > 0 { return phanTramHTThuc }
+        if targetThuc > 0, doanhThuThuc > 0 {
+            return (doanhThuThuc / targetThuc) * 100.0
+        }
+        return 0
+    }
+
     /// % Hoàn thành QĐ dự kiến
     var phanTramHTQDDuKienHienThi: Double {
         if phanTramHTQuyDoi > 0 { return phanTramHTQuyDoi }
