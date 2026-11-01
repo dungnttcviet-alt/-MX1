@@ -82,11 +82,29 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
         present(menu, animated: true)
     }
 
+    private func dongBoTamCaiDat() {
+        if let dangGo = oNhapCumTu.text?.trimmingCharacters(in: .whitespacesAndNewlines), !dangGo.isEmpty {
+            if !danhSachCumTu.contains(where: { $0.caseInsensitiveCompare(dangGo) == .orderedSame }) {
+                danhSachCumTu.insert(dangGo, at: 0)
+            }
+            oNhapCumTu.text = ""
+        }
+        let kieu = KieuHienThiBaoCao(rawValue: chonKieuHienThi.selectedSegmentIndex) ?? .bangChiTiet
+        let soCot = chonSoCotXuat.selectedSegmentIndex + 1
+        var moi = KhoDuLieu.dungChung.caiDat
+        moi.kieuHienThi = kieu
+        moi.danhSachCumTuLocBo = danhSachCumTu
+        moi.soCotXuatAnh = soCot
+        KhoDuLieu.dungChung.luuCaiDat(moi)
+    }
+
     @objc private func moChiaTarget() {
+        dongBoTamCaiDat()
         navigationController?.pushViewController(ManHinhChiaTarget(ngay: ngay), animated: true)
     }
 
     @objc private func moQuanLyNhanVien() {
+        dongBoTamCaiDat()
         navigationController?.pushViewController(ManHinhQuanLyNhanVien(), animated: true)
     }
 
@@ -256,19 +274,7 @@ final class ManHinhCaiDat: UIViewController, UITableViewDataSource, UITableViewD
     }
 
     @objc private func luuCaiDat() {
-        if let dangGo = oNhapCumTu.text?.trimmingCharacters(in: .whitespacesAndNewlines), !dangGo.isEmpty {
-            if !danhSachCumTu.contains(where: { $0.caseInsensitiveCompare(dangGo) == .orderedSame }) {
-                danhSachCumTu.insert(dangGo, at: 0)
-            }
-        }
-
-        let kieu = KieuHienThiBaoCao(rawValue: chonKieuHienThi.selectedSegmentIndex) ?? .bangChiTiet
-        let soCot = chonSoCotXuat.selectedSegmentIndex + 1
-        var moi = KhoDuLieu.dungChung.caiDat
-        moi.kieuHienThi = kieu
-        moi.danhSachCumTuLocBo = danhSachCumTu
-        moi.soCotXuatAnh = soCot
-        KhoDuLieu.dungChung.luuCaiDat(moi)
+        dongBoTamCaiDat()
         navigationController?.popViewController(animated: true)
     }
 
