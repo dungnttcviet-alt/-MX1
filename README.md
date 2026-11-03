@@ -18,3 +18,10 @@
    - Xuất ảnh báo cáo sắc nét theo 2 mẫu (`Bảng 8 cột chi tiết` hoặc `Thẻ tiến độ gọn 1–4 cột`).
    - Xuất ảnh bảng xếp hạng nhân viên của từng ngành hàng.
    - Xuất file Excel (`.csv` chuẩn UTF-8 BOM).
+
+5. **Mục Biểu đồ (2 nút nhấn chuyển đổi trực tiếp)**:
+   - **📊 Biểu đồ Realtime**: Theo dõi Doanh thu Lũy kế tháng, Đồ thị cột Doanh thu Thực & Quy đổi theo ngày của siêu thị và Bảng chi tiết Realtime theo ngày.
+   - **❤️ Biểu đồ Sức khỏe nhân viên (Trực quan cho 16 nhân viên)**:
+     - **🚨 Cảnh báo 5 nhân viên yếu nhiều ngày liên tục**: Tự động phát hiện và hiển thị nổi bật Top 5 nhân viên có chuỗi ngày yếu liên tục kèm khoảng ngày, tổng ngày yếu, % đóng góp TB và lịch sử màu từng ngày.
+     - **📊 Biểu đồ Cột ngang Sức khỏe 16 Nhân viên & 🗓️ Ma trận Heatmap 16 NV × Ngày**: Quan sát trực quan toàn bộ 16 nhân viên cùng lúc trên 1 màn hình (kèm đường chuẩn bình quân đội 6,25%/NV và chuỗi ô trạng thái ngày).
+     - **👤 Chi tiết từng nhân viên**: Chạm vào bất kỳ nhân viên nào trên hộp cảnh báo hoặc biểu đồ 16 nhân viên để xem ngay đồ thị cột và bảng chi tiết từng ngày của nhân viên đó.

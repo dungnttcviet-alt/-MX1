@@ -28,6 +28,18 @@ enum LoaiTabMuc: Int, CaseIterable {
     }
 }
 
+enum LoaiBieuDoMuc: Int, CaseIterable {
+    case bieuDoRealtime = 0
+    case bieuDoSucKhoeNhanVien = 1
+
+    var tieuDe: String {
+        switch self {
+        case .bieuDoRealtime: return "📊 Biểu đồ Realtime"
+        case .bieuDoSucKhoeNhanVien: return "❤️ Biểu đồ Sức khỏe nhân viên"
+        }
+    }
+}
+
 enum KieuSapXepNhanVien: Int, CaseIterable {
     case soMonHoanThanh = 0
     case doanhThuQD = 1
@@ -254,10 +266,43 @@ struct CanhBaoSucBanNhanVien: Hashable, Identifiable {
         return "✅ Nhịp bán ổn định"
     }
 
+    var tyLeSoVoiChuan: Double {
+        guard tyLeChuanBinhQuan > 0.001 else { return 0 }
+        return (tyLeDongGopTBThang / tyLeChuanBinhQuan) * 100.0
+    }
+
+    var tenRutGon: String {
+        let tu = nhanVien.hoTen.split(separator: " ").map(String.init)
+        if tu.count >= 2 {
+            return tu.suffix(2).joined(separator: " ")
+        }
+        return nhanVien.hoTen
+    }
+
+    var nhanHuyHieuChuoiYeu: String {
+        if dangYeuLienTucHienTai {
+            return "🚨 Yếu \(soNgayYeuLienTucHienTai) ngày liên tục"
+        }
+        if soNgayYeuLienTucDaiNhat >= 2 {
+            return "⚠️ Yếu \(soNgayYeuLienTucDaiNhat) ngày liên tục"
+        }
+        if soNgayYeu > 0 {
+            return "⚠️ Yếu \(soNgayYeu)/\(max(1, soNgayCoSoDoi)) ngày"
+        }
+        return "⚠️ Đóng góp thấp (\(tyLeDongGopTBThang.chuoiPhanTram))"
+    }
+
     var moTaChiTietCanhBao: String {
-        let trangThaiChuoi = dangYeuLienTucHienTai
-            ? "Đang yếu \(soNgayYeuLienTucHienTai) ngày liên tục"
-            : "Yếu \(soNgayYeuLienTucDaiNhat) ngày liên tục"
+        let trangThaiChuoi: String
+        if dangYeuLienTucHienTai {
+            trangThaiChuoi = "Đang yếu \(soNgayYeuLienTucHienTai) ngày liên tục"
+        } else if soNgayYeuLienTucDaiNhat >= 2 {
+            trangThaiChuoi = "Yếu \(soNgayYeuLienTucDaiNhat) ngày liên tục"
+        } else if soNgayYeu > 0 {
+            trangThaiChuoi = "Yếu \(soNgayYeu)/\(max(1, soNgayCoSoDoi)) ngày"
+        } else {
+            trangThaiChuoi = "Đóng góp dưới chuẩn"
+        }
         let phanNgay = khoangNgayYeuLienTuc.isEmpty ? "" : " (\(khoangNgayYeuLienTuc))"
         return "\(trangThaiChuoi)\(phanNgay) • Đóng góp TB: \(tyLeDongGopTBThang.chuoiPhanTram) (Chuẩn: \(tyLeChuanBinhQuan.chuoiPhanTram))"
     }
@@ -267,9 +312,11 @@ struct BaoCaoSucBanNhanVienThang {
     var nhanVienDangChon: NhanVienQuanLy
     var danhSachNhanVien: [NhanVienQuanLy]
     var chiTietTheoNgay: [DuLieuSucBanNgayNhanVien]
+    var bangChiTietTheoMaNV: [String: [DuLieuSucBanNgayNhanVien]]
     var tongKetNhanVienDangChon: CanhBaoSucBanNhanVien
     var tatCaTongKetNhanVien: [CanhBaoSucBanNhanVien]
     var danhSachCanhBaoYeuLienTuc: [CanhBaoSucBanNhanVien]
+    var danhSach5NhanVienYeuLienTuc: [CanhBaoSucBanNhanVien]
     var soNgayCoDuLieuNV: Int
     var tongDTQDToanDoiThang: Double
     var tongDTThucToanDoiThang: Double
@@ -1146,19 +1193,41 @@ final class KhoDuLieu {
             )
         }
 
+        let sapXepMucDoYeu: (CanhBaoSucBanNhanVien, CanhBaoSucBanNhanVien) -> Bool = { a, b in
+            if a.biCanhBaoNhieuNgayYeu != b.biCanhBaoNhieuNgayYeu {
+                return a.biCanhBaoNhieuNgayYeu && !b.biCanhBaoNhieuNgayYeu
+            }
+            if a.dangYeuLienTucHienTai != b.dangYeuLienTucHienTai {
+                return a.dangYeuLienTucHienTai && !b.dangYeuLienTucHienTai
+            }
+            if a.soNgayChuoiCanhBao != b.soNgayChuoiCanhBao {
+                return a.soNgayChuoiCanhBao > b.soNgayChuoiCanhBao
+            }
+            if a.soNgayYeu != b.soNgayYeu {
+                return a.soNgayYeu > b.soNgayYeu
+            }
+            return a.tyLeDongGopTBThang < b.tyLeDongGopTBThang
+        }
+
         let dsCanhBao = tatCaTongKet
             .filter { $0.biCanhBaoNhieuNgayYeu }
-            .sorted {
-                if $0.dangYeuLienTucHienTai != $1.dangYeuLienTucHienTai {
-                    return $0.dangYeuLienTucHienTai && !$1.dangYeuLienTucHienTai
-                }
-                if $0.soNgayChuoiCanhBao != $1.soNgayChuoiCanhBao {
-                    return $0.soNgayChuoiCanhBao > $1.soNgayChuoiCanhBao
-                }
-                return $0.tyLeDongGopTBThang < $1.tyLeDongGopTBThang
-            }
+            .sorted(by: sapXepMucDoYeu)
 
-        let nvChon = dsNVQuanLy.first(where: { $0.maNV == maNVChon }) ?? dsNVQuanLy.first ?? NhanVienQuanLy(maNV: "24939", hoTen: "Phan Hoàng Sơn")
+        // Lấy Top 5 nhân viên yếu nhiều ngày liên tục (ưu tiên chuỗi ngày yếu liên tục >= 2 ngày, nếu chưa đủ 5 thì bổ sung nhân viên có ngày yếu / tỷ lệ đóng góp thấp nhất)
+        let dsTop5Yeu: [CanhBaoSucBanNhanVien]
+        if soNgayCoDuLieuNV == 0 {
+            dsTop5Yeu = []
+        } else if dsCanhBao.count >= 5 {
+            dsTop5Yeu = Array(dsCanhBao.prefix(5))
+        } else {
+            let maDaCo = Set(dsCanhBao.map { $0.nhanVien.maNV })
+            let boSung = tatCaTongKet
+                .filter { !maDaCo.contains($0.nhanVien.maNV) && ($0.soNgayYeu > 0 || $0.tyLeDongGopTBThang < tyLeChuan) }
+                .sorted(by: sapXepMucDoYeu)
+            dsTop5Yeu = Array((dsCanhBao + boSung).prefix(5))
+        }
+
+        let nvChon = dsNVQuanLy.first(where: { $0.maNV == maNVChon }) ?? dsTop5Yeu.first?.nhanVien ?? dsNVQuanLy.first ?? NhanVienQuanLy(maNV: "24939", hoTen: "Phan Hoàng Sơn")
         let chiTietChon = bangChiTietTheoMaNV[nvChon.maNV] ?? []
         let tongKetChon = tatCaTongKet.first(where: { $0.nhanVien.maNV == nvChon.maNV }) ?? CanhBaoSucBanNhanVien(
             nhanVien: nvChon,
@@ -1180,9 +1249,11 @@ final class KhoDuLieu {
             nhanVienDangChon: nvChon,
             danhSachNhanVien: dsNVQuanLy,
             chiTietTheoNgay: chiTietChon,
+            bangChiTietTheoMaNV: bangChiTietTheoMaNV,
             tongKetNhanVienDangChon: tongKetChon,
             tatCaTongKetNhanVien: tatCaTongKet,
             danhSachCanhBaoYeuLienTuc: dsCanhBao,
+            danhSach5NhanVienYeuLienTuc: dsTop5Yeu,
             soNgayCoDuLieuNV: soNgayCoDuLieuNV,
             tongDTQDToanDoiThang: tongQDToanDoiThang,
             tongDTThucToanDoiThang: tongThucToanDoiThang

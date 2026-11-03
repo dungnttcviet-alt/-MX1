@@ -255,6 +255,9 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         bangRealtimeThang.khiBamQuetDoanhThuNVRealtime = { [weak self] in
             self?.moChonAnh(cheDo: .doanhThuNhanVien(.realtime), gioiHan: 0)
         }
+        bangRealtimeThang.khiDoiCheDoBieuDo = { [weak self] _ in
+            self?.capNhatTrangThaiMuc()
+        }
 
         taoGiaoDienKhungDuPhong()
 
@@ -435,7 +438,11 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
         if laNhanVien {
             nutThemAnhMoi.setTitle(" Thêm ảnh DT NV (\(nhanCheDo))", for: .normal)
         } else if laRTThang {
-            nutThemAnhMoi.setTitle(" Quét DT Realtime / DT NV ngày", for: .normal)
+            if bangRealtimeThang.cheDoBieuDoHienTai == .bieuDoSucKhoeNhanVien {
+                nutThemAnhMoi.setTitle(" Quét DT NV ngày (Sức khỏe NV)", for: .normal)
+            } else {
+                nutThemAnhMoi.setTitle(" Quét DT Realtime / DT NV ngày", for: .normal)
+            }
         } else if laThiDua {
             nutThemAnhMoi.setTitle(" Thêm ảnh Thi đua (\(nhanCheDo))", for: .normal)
         } else {
@@ -1117,34 +1124,45 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             ? CaiDatDMX.nhanVienMau
             : KhoDuLieu.dungChung.caiDat.danhSachNhanVien
 
-        // Tạo dữ liệu mẫu Realtime cho 4 ngày gần nhất trong tháng để hiển thị đầy đủ Biểu đồ sức bán NV theo ngày & Cảnh báo nhiều ngày yếu liên tục
+        // Tạo dữ liệu mẫu Realtime cho 6 ngày liên tiếp trong tháng hiện tại để hiển thị trực quan 16 nhân viên & Cảnh báo 5 nhân viên yếu nhiều ngày liên tục
         let ngayGoc = ngayHienTai
+        let namGoc = lich.component(.year, from: ngayGoc)
         let thangGoc = lich.component(.month, from: ngayGoc)
-        for lui in (0...3).reversed() {
-            guard let ngayXet = lich.date(byAdding: .day, value: -lui, to: ngayGoc),
-                  lich.component(.month, from: ngayXet) == thangGoc else { continue }
+        let ngaySoGoc = lich.component(.day, from: ngayGoc)
+        let soNgayThang = lich.range(of: .day, in: .month, for: ngayGoc)?.count ?? 30
+        let ngayKetThucMau = min(soNgayThang, max(6, ngaySoGoc))
+        let ngayBatDauMau = max(1, ngayKetThucMau - 5)
+        let cacNgayMau = Array(ngayBatDauMau...ngayKetThucMau)
+
+        for (thuTuNgay, ngayTrongThang) in cacNgayMau.enumerated() {
+            var comp = DateComponents()
+            comp.year = namGoc
+            comp.month = thangGoc
+            comp.day = ngayTrongThang
+            guard let ngayXet = lich.date(from: comp) else { continue }
             var dlNgay = KhoDuLieu.dungChung.duLieu(cho: ngayXet)
-            let heSoNgay = 1.0 - Double(lui) * 0.04
+            let lui = (cacNgayMau.count - 1) - thuTuNgay // 0 là ngày cuối chuỗi mẫu, 5 là ngày đầu chuỗi mẫu
+            let heSoNgay = 1.0 - Double(lui) * 0.03
             dlNgay.doanhThuRealtime = ThongTinDoanhThu(
-                doanhThuThuc: (385.50 * heSoNgay).rounded(),
+                doanhThuThuc: (395.0 * heSoNgay).rounded(),
                 targetThuc: 420.00,
-                duKienThuc: 410.00,
-                phanTramHTThuc: 91.8,
-                doanhThuQuyDoi: (542.80 * heSoNgay).rounded(),
+                duKienThuc: 412.00,
+                phanTramHTThuc: 94.0,
+                doanhThuQuyDoi: (556.0 * heSoNgay).rounded(),
                 targetQuyDoi: 560.00,
-                duKienQuyDoi: 575.00,
-                phanTramHTQuyDoi: 96.9,
-                phanTramTraGop: 44.2,
-                doanhThuTraGop: 239.90,
-                luotKhach: Double(645 - lui * 18),
-                soBill: Double(78 - lui * 3),
-                phanTramPVTC: 12.1,
-                tangGiamCungKy: 8.4,
+                duKienQuyDoi: 580.00,
+                phanTramHTQuyDoi: 99.3,
+                phanTramTraGop: 44.5,
+                doanhThuTraGop: 245.0,
+                luotKhach: Double(650 - lui * 15),
+                soBill: Double(80 - lui * 2),
+                phanTramPVTC: 12.3,
+                tangGiamCungKy: 8.6,
                 coTangGiam: true,
-                tb3Thang: 355.6,
-                soNgayDaQua: 29,
-                tongSoNgay: 31,
-                phanTramTienDoThang: 94.0
+                tb3Thang: 360.0,
+                soNgayDaQua: ngayKetThucMau,
+                tongSoNgay: soNgayThang,
+                phanTramTienDoThang: (Double(ngayKetThucMau) / Double(soNgayThang)) * 100.0
             )
 
             var dsNVRealtimeNgay: [DoanhThuNhanVienItem] = []
@@ -1152,21 +1170,37 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
                 let dtQD: Double
                 let dtThuc: Double
                 let soDon: Double
-                // Mô phỏng 2 nhân viên bị yếu nhiều ngày liên tục để Quản lý kiểm tra tính năng Cảnh báo:
+                // Mô phỏng đúng 5 nhân viên bị yếu nhiều ngày liên tục trong 16 nhân viên để Quản lý quan sát trực quan:
                 if idx == 5 {
-                    // Nhân viên thứ 6 (VD: 285688 - Lê Tuấn): yếu 3 ngày liên tục gần nhất
-                    dtQD = (lui == 3) ? 38.0 : (lui == 1 ? 0.0 : 8.5)
+                    // #1 Cảnh báo: 285688 - Lê Tuấn -> Yếu 5 ngày liên tục gần nhất (lui = 0,1,2,3,4)
+                    dtQD = (lui <= 4) ? (lui == 1 ? 0.0 : 6.5) : 38.0
                     dtThuc = (dtQD * 0.68).rounded()
-                    soDon = dtQD > 0 ? 2 : 0
+                    soDon = dtQD > 0 ? 1 : 0
                 } else if idx == 10 {
-                    // Nhân viên thứ 11 (VD: 34922 - Đỗ Thị Chanh): yếu 2 ngày liên tục gần nhất
-                    dtQD = (lui <= 1) ? 7.2 : 34.0
+                    // #2 Cảnh báo: 34922 - Đỗ Thị Chanh -> Yếu 4 ngày liên tục gần nhất (lui = 0,1,2,3)
+                    dtQD = (lui <= 3) ? (lui == 0 ? 0.0 : 7.8) : 36.0
+                    dtThuc = (dtQD * 0.70).rounded()
+                    soDon = dtQD > 0 ? 2 : 0
+                } else if idx == 13 {
+                    // #3 Cảnh báo: 280417 - Huỳnh Thành Đạt -> Yếu 3 ngày liên tục gần nhất (lui = 0,1,2)
+                    dtQD = (lui <= 2) ? 8.2 : 35.0
                     dtThuc = (dtQD * 0.70).rounded()
                     soDon = 2
-                } else {
-                    let goc = Double(46 - (idx % 6) * 4 + ((lui + idx) % 3) * 5)
-                    dtQD = max(22.0, goc)
+                } else if idx == 9 {
+                    // #4 Cảnh báo: 194649 - Nguyễn Hoàn Điện -> Yếu 3 ngày liên tục (lui = 1,2,3)
+                    dtQD = (lui >= 1 && lui <= 3) ? 7.5 : 33.0
                     dtThuc = (dtQD * 0.71).rounded()
+                    soDon = 2
+                } else if idx == 15 {
+                    // #5 Cảnh báo: 23997 - Lê Thị Kim Phượng -> Yếu 2 ngày liên tục gần nhất (lui = 0,1)
+                    dtQD = (lui <= 1) ? 8.8 : 34.0
+                    dtThuc = (dtQD * 0.71).rounded()
+                    soDon = 2
+                } else {
+                    // 11 nhân viên còn lại đạt & tốt ổn định
+                    let goc = Double(48 - (idx % 6) * 3 + ((lui + idx) % 3) * 4)
+                    dtQD = max(28.0, goc)
+                    dtThuc = (dtQD * 0.72).rounded()
                     soDon = Double(5 + (idx % 4))
                 }
                 dsNVRealtimeNgay.append(
