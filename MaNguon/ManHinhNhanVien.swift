@@ -244,7 +244,7 @@ final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UI
             title = dong.tenNganhHang
         }
 
-        danhSachXepHang = KhoDuLieu.dungChung.danhSachXepHangNhanVien(cho: dong, den: ngay)
+        danhSachXepHang = KhoDuLieu.dungChung.danhSachXepHangNhanVien(cho: dong, den: ngay, cheDo: cheDo)
         let soNV = danhSachXepHang.count
         let targetMoiNV = soNV > 0 ? dong.target / Double(soNV) : 0
         let donVi = dl.thongTinDonVi.isEmpty ? "ĐIỆN MÁY XANH" : dl.thongTinDonVi
@@ -325,12 +325,14 @@ final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UI
                     }
 
                     var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngay)
-                    dl.thiDuaNhanVien = KhoDuLieu.dungChung.gopKetQuaThiDuaNhanVien(
-                        hienTai: dl.thiDuaNhanVien,
+                    let bangMoi = KhoDuLieu.dungChung.gopKetQuaThiDuaNhanVien(
+                        hienTai: dl.thiDuaNhanVien(theo: self.cheDo),
                         mangKhoiNV: cacKhoi,
                         ngay: self.ngay,
+                        cheDo: self.cheDo,
                         khoaNganhMacDinh: khoaMacDinh
                     )
+                    dl.ganThiDuaNhanVien(bangMoi, theo: self.cheDo)
                     KhoDuLieu.dungChung.luu(dl)
                     self.napDuLieu()
                     self.khiCapNhatDuLieu?()
@@ -516,7 +518,9 @@ final class ManHinhChiTietNganhHang: UIViewController, UITableViewDataSource, UI
             let giaTri = Double(chu) ?? 0
             let khoa = KhoDuLieu.chuanHoaKhoaSoSanh(self.dong.tenNganhHang)
             var dl = KhoDuLieu.dungChung.duLieu(cho: self.ngay)
-            dl.thiDuaNhanVien[khoa, default: [:]][item.maNV] = giaTri
+            var bang = dl.thiDuaNhanVien(theo: self.cheDo)
+            bang[khoa, default: [:]][item.maNV] = giaTri
+            dl.ganThiDuaNhanVien(bang, theo: self.cheDo)
             KhoDuLieu.dungChung.luu(dl)
             self.napDuLieu()
             self.khiCapNhatDuLieu?()
@@ -668,6 +672,7 @@ final class BangNhanVienView: UIView, UITableViewDataSource, UITableViewDelegate
     var khiBamMoCaiDatNV: (() -> Void)?
 
     private var ngayHienTai = Date()
+    private(set) var cheDoDoanhThu: LoaiCheDoDoanhThu = .luyKe
     private var kieuSapXep: KieuSapXepNhanVien = .soMonHoanThanh
     private var danhSach: [TongHopNhanVien] = []
 
@@ -802,7 +807,7 @@ final class BangNhanVienView: UIView, UITableViewDataSource, UITableViewDelegate
                 self.kieuSapXep = kieu
                 self.nutSapXep.setTitle(" ⇅ \(kieu.nhanNgan)", for: .normal)
                 self.cauHinhMenuSapXep()
-                self.capNhat(cho: self.ngayHienTai)
+                self.capNhat(cho: self.ngayHienTai, cheDo: self.cheDoDoanhThu)
             }
         }
         nutSapXep.menu = UIMenu(title: "Sắp xếp nhân viên", children: actions)
@@ -817,11 +822,14 @@ final class BangNhanVienView: UIView, UITableViewDataSource, UITableViewDelegate
         khiBamMoCaiDatNV?()
     }
 
-    func capNhat(cho ngay: Date) {
+    func capNhat(cho ngay: Date, cheDo: LoaiCheDoDoanhThu = .luyKe) {
         ngayHienTai = ngay
-        danhSach = KhoDuLieu.dungChung.tongHopNhanVien(den: ngay, sapXep: kieuSapXep)
-        let soMonThang = KhoDuLieu.dungChung.danhSachMatHangThang(den: ngay).count
-        nhanTieuDe.text = "🏆 Xếp Hạng (\(danhSach.count) NV • \(soMonThang) môn)"
+        cheDoDoanhThu = cheDo
+        danhSach = KhoDuLieu.dungChung.tongHopNhanVien(den: ngay, sapXep: kieuSapXep, cheDo: cheDo)
+        let soMonThang = KhoDuLieu.dungChung.danhSachMatHangThang(den: ngay, cheDo: cheDo).count
+        let nhanCheDo = (cheDo == .luyKe) ? "Lũy kế" : "Realtime"
+        nhanTieuDe.text = "🏆 Xếp Hạng \(nhanCheDo) (\(danhSach.count) NV • \(soMonThang) môn)"
+        nutQuetDTNV.setTitle(" Nhập ảnh DT (\(nhanCheDo))", for: .normal)
 
         let trong = danhSach.isEmpty
         khungTrong.isHidden = !trong
@@ -969,8 +977,9 @@ final class BangNhanVienView: UIView, UITableViewDataSource, UITableViewDelegate
 
     // MARK: - Xuất Ảnh Bảng Xếp Hạng Tổng Hợp Nhân Viên
 
-    func taoAnhBaoCaoNhanVien(ngay: Date, thongTinDonVi: String = "", capNhatLuc: String = "") -> UIImage? {
-        let ds = danhSach.isEmpty ? KhoDuLieu.dungChung.tongHopNhanVien(den: ngay, sapXep: kieuSapXep) : danhSach
+    func taoAnhBaoCaoNhanVien(ngay: Date, cheDo: LoaiCheDoDoanhThu? = nil, thongTinDonVi: String = "", capNhatLuc: String = "") -> UIImage? {
+        let cheDoXuat = cheDo ?? cheDoDoanhThu
+        let ds = danhSach.isEmpty ? KhoDuLieu.dungChung.tongHopNhanVien(den: ngay, sapXep: kieuSapXep, cheDo: cheDoXuat) : danhSach
         let dl = KhoDuLieu.dungChung.duLieu(cho: ngay)
         let donVi = !thongTinDonVi.isEmpty ? thongTinDonVi : (dl.thongTinDonVi.isEmpty ? "ĐIỆN MÁY XANH" : dl.thongTinDonVi)
         let ngayStr = TienIchNgay.hienThiNgay.string(from: ngay)
