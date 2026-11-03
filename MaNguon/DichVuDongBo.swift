@@ -7,6 +7,7 @@ struct PhienDangNhapDMX: Codable {
     var expiresAt: Int
     var userId: String?
     var tenDangNhap: String
+    var laAdmin: Bool?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
@@ -14,11 +15,20 @@ struct PhienDangNhapDMX: Codable {
         case expiresAt = "expires_at"
         case userId = "user_id"
         case tenDangNhap = "ten_dang_nhap"
+        case laAdmin = "la_admin"
     }
 }
 
+struct ThongTinTaiKhoanDMX: Codable, Hashable, Identifiable {
+    var id: String
+    var tenDangNhap: String
+    var email: String
+    var laAdmin: Bool
+    var ngayTao: String
+    var dangNhapCuoi: String
+}
+
 private struct LoiMayChu: Codable { var loi: String? }
-private struct DangKyThanhCong: Codable { var thanh_cong: Bool? }
 private struct DuLieuDamMay: Codable {
     var caiDat: CaiDatDMX?
     var cacNgay: [String: DuLieuNgayDMX]?
@@ -31,23 +41,63 @@ private struct GoiDongBo: Codable {
 
 // MARK: - Phản hồi từ Supabase Auth & REST API trực tiếp
 
+private struct AnyCodableValue: Codable {
+    var stringValue: String
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let s = try? c.decode(String.self) {
+            stringValue = s
+        } else if let b = try? c.decode(Bool.self) {
+            stringValue = b ? "true" : "false"
+        } else if let i = try? c.decode(Int.self) {
+            stringValue = String(i)
+        } else if let d = try? c.decode(Double.self) {
+            stringValue = String(d)
+        } else {
+            stringValue = ""
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(stringValue)
+    }
+}
+
 private struct SupabaseAuthUser: Codable {
     var id: String
     var email: String?
     var userMetadata: [String: String]?
+    var createdAt: String?
+    var lastSignInAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case email
         case userMetadata = "user_metadata"
+        case createdAt = "created_at"
+        case lastSignInAt = "last_sign_in_at"
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = (try? c.decode(String.self, forKey: .id)) ?? ""
         email = try? c.decode(String.self, forKey: .email)
-        userMetadata = try? c.decode([String: String].self, forKey: .userMetadata)
+        createdAt = try? c.decode(String.self, forKey: .createdAt)
+        lastSignInAt = try? c.decode(String.self, forKey: .lastSignInAt)
+        if let dict = try? c.decode([String: String].self, forKey: .userMetadata) {
+            userMetadata = dict
+        } else if let rawDict = try? c.decode([String: AnyCodableValue].self, forKey: .userMetadata) {
+            userMetadata = rawDict.mapValues { $0.stringValue }
+        } else {
+            userMetadata = nil
+        }
     }
+}
+
+private struct DanhSachAdminUsersResponse: Codable {
+    var users: [SupabaseAuthUser]?
 }
 
 private struct SupabaseAuthResponse: Codable {
@@ -102,32 +152,46 @@ final class DichVuDongBo {
     private let khoaCongKhaiSupabase = "sb_publishable_mafynf1XYupP9W_WeLYSRg_M7cjJXPS"
     private let khoaBiMatSupabase = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzeHJ4ZWF4eXR5aXlkeGl3dnVjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDQ1OTY1OCwiZXhwIjoyMTAwMDM1NjU4fQ.V7zW8iMiwuKCHGY-1tG1ociK-aeUXwX0BnhqDf1rTo4"
     private let tenBucket = "dmx-du-lieu"
+    private let hauToEmailDmx = "@dmx.internal.duongnt.io.vn"
 
     private let khoaKeychain = "com.thanhduong.tonghopdmx.phien-dang-nhap"
+    private let khoaDaDonDepLocal = "com.thanhduong.tonghopdmx.da-don-dep-tai-khoan-cu-v1"
     private let hangDoi = DispatchQueue(label: "com.thanhduong.tonghopdmx.dongbo")
     private(set) var phien: PhienDangNhapDMX?
 
     var daDangNhap: Bool { phien != nil }
     var tenDangNhap: String { phien?.tenDangNhap ?? "" }
+    var laAdmin: Bool {
+        if tenDangNhap.lowercased() == "duongnt" { return true }
+        return phien?.laAdmin ?? false
+    }
 
     private init() { phien = docKeychain() }
 
-    private func taoEmailDmx(_ tenDangNhap: String) -> String {
-        let sach = tenDangNhap
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+    func chuanHoaTenDangNhap(_ raw: String) -> String {
+        raw.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
             .replacingOccurrences(of: "đ", with: "d")
             .replacingOccurrences(of: "Đ", with: "D")
             .lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "[^a-z0-9._-]+", with: "-", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return "\(sach)@dmx.internal.duongnt.io.vn"
     }
 
-    // MARK: - 1. Đăng nhập (Trực tiếp qua Supabase Auth + dự phòng qua Web API)
+    private func taoEmailDmx(_ tenDangNhap: String) -> String {
+        "\(chuanHoaTenDangNhap(tenDangNhap))\(hauToEmailDmx)"
+    }
+
+    private func xacDinhLaAdmin(user: SupabaseAuthUser, tenDangNhap: String) -> Bool {
+        if tenDangNhap.lowercased() == "duongnt" { return true }
+        let v = (user.userMetadata?["la_admin"] ?? "").lowercased()
+        return v == "true" || v == "1"
+    }
+
+    // MARK: - 1. Đăng nhập & Khởi tạo Admin gốc
 
     func dangNhap(tenDangNhap: String, matKhau: String, hoanTat: @escaping (Result<Void, Error>) -> Void) {
-        let tenChuan = tenDangNhap.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let tenChuan = chuanHoaTenDangNhap(tenDangNhap)
         let email = taoEmailDmx(tenChuan)
         let body: [String: String] = ["email": email, "password": matKhau]
 
@@ -147,56 +211,173 @@ final class DichVuDongBo {
                 }
                 let exp = authRes.expiresAt ?? (Int(Date().timeIntervalSince1970) + (authRes.expiresIn ?? 3600))
                 let tenHienThi = authRes.user?.userMetadata?["ten_dang_nhap"] ?? tenChuan
+                let laAdminQuyen = authRes.user.map { self.xacDinhLaAdmin(user: $0, tenDangNhap: tenHienThi) } ?? (tenHienThi.lowercased() == "duongnt")
                 let phienMoi = PhienDangNhapDMX(
                     accessToken: token,
                     refreshToken: refresh,
                     expiresAt: exp,
                     userId: authRes.user?.id,
-                    tenDangNhap: tenHienThi
+                    tenDangNhap: tenHienThi,
+                    laAdmin: laAdminQuyen
                 )
                 self.phien = phienMoi
                 self.luuKeychain(phienMoi)
+                if tenHienThi.lowercased() == "duongnt", let uid = authRes.user?.id {
+                    self.damBaoMetadataAdminChoDuongnt(userId: uid, metadataHienTai: authRes.user?.userMetadata)
+                }
                 hoanTat(.success(()))
             case .failure(let loi):
-                // Dự phòng gọi sang Web API nếu có
-                let webBody = ["ten_dang_nhap": tenChuan, "mat_khau": matKhau]
-                self.guiWeb(path: "/api/dmx/ung-dung/dang-nhap", method: "POST", body: webBody, canDangNhap: false) { [weak self] (kqWeb: Result<PhienDangNhapDMX, Error>) in
-                    switch kqWeb {
-                    case .success(let phienWeb):
-                        self?.phien = phienWeb
-                        self?.luuKeychain(phienWeb)
-                        hoanTat(.success(()))
-                    case .failure:
-                        hoanTat(.failure(loi))
-                    }
+                if tenChuan == "duongnt" {
+                    self.kiemTraVaKhoiTaoDuongntNeuChuaCo(matKhau: matKhau, loiGoc: loi, hoanTat: hoanTat)
+                    return
                 }
+                hoanTat(.failure(loi))
             }
         }
     }
 
-    // MARK: - 2. Đăng ký tài khoản mới (Trực tiếp qua Supabase Auth)
+    private func damBaoMetadataAdminChoDuongnt(userId: String, metadataHienTai: [String: String]?) {
+        guard (metadataHienTai?["la_admin"] ?? "") != "true" else { return }
+        var meta = metadataHienTai ?? [:]
+        meta["ung_dung"] = "dmx"
+        meta["ten_dang_nhap"] = "duongnt"
+        meta["la_admin"] = "true"
+        capNhatUserSupabaseAdmin(userId: userId, matKhauMoi: nil, userMetadata: meta) { _ in }
+    }
 
-    func dangKy(tenDangNhap: String, matKhau: String, hoanTat: @escaping (Result<Void, Error>) -> Void) {
-        let tenChuan = tenDangNhap.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    private func kiemTraVaKhoiTaoDuongntNeuChuaCo(matKhau: String, loiGoc: Error, hoanTat: @escaping (Result<Void, Error>) -> Void) {
+        layDanhSachUsersSupabaseAdmin { [weak self] kq in
+            guard let self else { return }
+            if case .success(let users) = kq {
+                let emailDuongnt = self.taoEmailDmx("duongnt")
+                if users.contains(where: { ($0.email ?? "").lowercased() == emailDuongnt }) {
+                    hoanTat(.failure(loiGoc))
+                    return
+                }
+                self.adminTaoTaiKhoanMoi(tenDangNhap: "duongnt", matKhau: matKhau, laAdmin: true) { kqTao in
+                    switch kqTao {
+                    case .success:
+                        self.dangNhap(tenDangNhap: "duongnt", matKhau: matKhau, hoanTat: hoanTat)
+                    case .failure:
+                        hoanTat(.failure(loiGoc))
+                    }
+                }
+            } else {
+                hoanTat(.failure(loiGoc))
+            }
+        }
+    }
+
+    func thucHienKhoiTaoAdminVaXoaTaiKhoanCuNeuCan(hoanTat: (() -> Void)? = nil) {
+        if UserDefaults.standard.bool(forKey: khoaDaDonDepLocal) {
+            hoanTat?()
+            return
+        }
+        layDanhSachUsersSupabaseAdmin { [weak self] kq in
+            guard let self else { hoanTat?(); return }
+            guard case .success(let users) = kq else { hoanTat?(); return }
+            let emailDuongnt = self.taoEmailDmx("duongnt")
+            let userDuongnt = users.first(where: { ($0.email ?? "").lowercased() == emailDuongnt })
+            if let u = userDuongnt, (u.userMetadata?["da_don_dep_tai_khoan_v1"] ?? "") == "true" {
+                UserDefaults.standard.set(true, forKey: self.khoaDaDonDepLocal)
+                hoanTat?()
+                return
+            }
+            if let u = userDuongnt {
+                var meta = u.userMetadata ?? [:]
+                meta["ung_dung"] = "dmx"
+                meta["ten_dang_nhap"] = "duongnt"
+                meta["la_admin"] = "true"
+                meta["da_don_dep_tai_khoan_v1"] = "true"
+                self.capNhatUserSupabaseAdmin(userId: u.id, matKhauMoi: nil, userMetadata: meta) { _ in }
+            }
+            UserDefaults.standard.set(true, forKey: self.khoaDaDonDepLocal)
+            hoanTat?()
+        }
+    }
+
+    func dangXuat() {
+        phien = nil
+        xoaKeychain()
+        KhoDuLieu.dungChung.datLaiSauDangXuat()
+    }
+
+    // MARK: - 2. Quản trị Tài khoản (Supabase Admin API)
+
+    func layDanhSachTaiKhoan(hoanTat: @escaping (Result<[ThongTinTaiKhoanDMX], Error>) -> Void) {
+        layDanhSachUsersSupabaseAdmin { [weak self] kq in
+            guard let self else { return }
+            switch kq {
+            case .success(let users):
+                let ds: [ThongTinTaiKhoanDMX] = users.compactMap { u in
+                    let email = (u.email ?? "").lowercased()
+                    let ungDung = u.userMetadata?["ung_dung"] ?? ""
+                    guard email.hasSuffix(self.hauToEmailDmx) || ungDung == "dmx" else { return nil }
+                    let tenTuEmail = email.replacingOccurrences(of: self.hauToEmailDmx, with: "")
+                    let ten = u.userMetadata?["ten_dang_nhap"] ?? tenTuEmail
+                    let laAdminUser = self.xacDinhLaAdmin(user: u, tenDangNhap: ten)
+                    return ThongTinTaiKhoanDMX(
+                        id: u.id,
+                        tenDangNhap: ten,
+                        email: email,
+                        laAdmin: laAdminUser,
+                        ngayTao: self.dinhDangNgayISO(u.createdAt),
+                        dangNhapCuoi: self.dinhDangNgayISO(u.lastSignInAt)
+                    )
+                }.sorted { a, b in
+                    if a.tenDangNhap.lowercased() == "duongnt" { return true }
+                    if b.tenDangNhap.lowercased() == "duongnt" { return false }
+                    if a.laAdmin != b.laAdmin { return a.laAdmin && !b.laAdmin }
+                    return a.tenDangNhap.localizedCaseInsensitiveCompare(b.tenDangNhap) == .orderedAscending
+                }
+                DispatchQueue.main.async { hoanTat(.success(ds)) }
+            case .failure(let loi):
+                DispatchQueue.main.async { hoanTat(.failure(loi)) }
+            }
+        }
+    }
+
+    func adminTaoTaiKhoanMoi(
+        tenDangNhap: String,
+        matKhau: String,
+        laAdmin: Bool,
+        hoanTat: @escaping (Result<ThongTinTaiKhoanDMX, Error>) -> Void
+    ) {
+        let tenChuan = chuanHoaTenDangNhap(tenDangNhap)
+        guard tenChuan.range(of: "^[a-z0-9][a-z0-9._-]{2,39}$", options: .regularExpression) != nil else {
+            hoanTat(.failure(NSError.dmx("Tên đăng nhập gồm 3–40 ký tự: chữ thường, số, dấu chấm, gạch ngang hoặc gạch dưới.")))
+            return
+        }
+        guard matKhau.count >= 6 else {
+            hoanTat(.failure(NSError.dmx("Mật khẩu cần có ít nhất 6 ký tự.")))
+            return
+        }
         let email = taoEmailDmx(tenChuan)
 
-        struct GoiDangKySupabase: Encodable {
+        struct GoiTaoUser: Encodable {
             let email: String
             let password: String
-            let data: [String: String]
+            let email_confirm: Bool
+            let user_metadata: [String: String]
         }
 
-        let goi = GoiDangKySupabase(
+        let goi = GoiTaoUser(
             email: email,
             password: matKhau,
-            data: ["ung_dung": "dmx", "ten_dang_nhap": tenChuan]
+            email_confirm: true,
+            user_metadata: [
+                "ung_dung": "dmx",
+                "ten_dang_nhap": tenChuan,
+                "la_admin": (laAdmin || tenChuan == "duongnt") ? "true" : "false"
+            ]
         )
 
-        var req = URLRequest(url: diaChiSupabase.appendingPathComponent("/auth/v1/signup"))
+        var req = URLRequest(url: diaChiSupabase.appendingPathComponent("/auth/v1/admin/users"))
         req.httpMethod = "POST"
         req.timeoutInterval = 25
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(khoaCongKhaiSupabase, forHTTPHeaderField: "apikey")
+        req.setValue(khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
         req.httpBody = try? JSONEncoder().encode(goi)
 
         URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
@@ -211,39 +392,238 @@ final class DichVuDongBo {
                 let errObj = try? JSONDecoder().decode(SupabaseAuthError.self, from: duLieu)
                 let msg = errObj?.msg ?? errObj?.message ?? errObj?.errorDescription ?? ""
                 let laTrung = status == 422 || status == 409 || msg.localizedCaseInsensitiveContains("already")
-                let thongBao = laTrung ? "Tên đăng nhập này đã được sử dụng." : (msg.isEmpty ? "Chưa tạo được tài khoản. Hãy thử lại." : msg)
+                let thongBao = laTrung ? "Tên đăng nhập \"\(tenChuan)\" đã tồn tại." : (msg.isEmpty ? "Chưa tạo được tài khoản mới." : msg)
                 DispatchQueue.main.async { hoanTat(.failure(NSError.dmx(thongBao))) }
                 return
             }
-
-            if let authRes = try? JSONDecoder().decode(SupabaseAuthResponse.self, from: duLieu),
-               let token = authRes.accessToken,
-               let refresh = authRes.refreshToken {
-                let exp = authRes.expiresAt ?? (Int(Date().timeIntervalSince1970) + (authRes.expiresIn ?? 3600))
-                let phienMoi = PhienDangNhapDMX(
-                    accessToken: token,
-                    refreshToken: refresh,
-                    expiresAt: exp,
-                    userId: authRes.user?.id,
-                    tenDangNhap: tenChuan
+            if let u = try? JSONDecoder().decode(SupabaseAuthUser.self, from: duLieu), !u.id.isEmpty {
+                let tk = ThongTinTaiKhoanDMX(
+                    id: u.id,
+                    tenDangNhap: tenChuan,
+                    email: email,
+                    laAdmin: laAdmin || tenChuan == "duongnt",
+                    ngayTao: self.dinhDangNgayISO(u.createdAt),
+                    dangNhapCuoi: self.dinhDangNgayISO(u.lastSignInAt)
                 )
-                DispatchQueue.main.async {
-                    self.phien = phienMoi
-                    self.luuKeychain(phienMoi)
-                    hoanTat(.success(()))
-                }
+                DispatchQueue.main.async { hoanTat(.success(tk)) }
             } else {
-                DispatchQueue.main.async {
-                    self.dangNhap(tenDangNhap: tenChuan, matKhau: matKhau, hoanTat: hoanTat)
-                }
+                DispatchQueue.main.async { hoanTat(.failure(NSError.dmx("Chưa tạo được tài khoản mới."))) }
             }
         }.resume()
     }
 
-    func dangXuat() {
-        phien = nil
-        xoaKeychain()
-        KhoDuLieu.dungChung.datLaiSauDangXuat()
+    func doiMatKhauCaNhan(matKhauMoi: String, hoanTat: @escaping (Result<Void, Error>) -> Void) {
+        guard matKhauMoi.count >= 6 else {
+            hoanTat(.failure(NSError.dmx("Mật khẩu cần có ít nhất 6 ký tự.")))
+            return
+        }
+        damBaoUserId { [weak self] uid in
+            guard let self, let uid, !uid.isEmpty else {
+                DispatchQueue.main.async { hoanTat(.failure(NSError.dmx("Không xác định được phiên tài khoản hiện tại."))) }
+                return
+            }
+            self.capNhatUserSupabaseAdmin(userId: uid, matKhauMoi: matKhauMoi, userMetadata: nil, hoanTat: hoanTat)
+        }
+    }
+
+    func adminDoiMatKhau(userId: String, matKhauMoi: String, hoanTat: @escaping (Result<Void, Error>) -> Void) {
+        guard matKhauMoi.count >= 6 else {
+            hoanTat(.failure(NSError.dmx("Mật khẩu cần có ít nhất 6 ký tự.")))
+            return
+        }
+        capNhatUserSupabaseAdmin(userId: userId, matKhauMoi: matKhauMoi, userMetadata: nil, hoanTat: hoanTat)
+    }
+
+    func adminDatQuyenAdmin(taiKhoan: ThongTinTaiKhoanDMX, laAdmin: Bool, hoanTat: @escaping (Result<Void, Error>) -> Void) {
+        if taiKhoan.tenDangNhap.lowercased() == "duongnt" && !laAdmin {
+            hoanTat(.failure(NSError.dmx("\"duongnt\" là Admin gốc của dự án, không thể gỡ quyền Admin.")))
+            return
+        }
+        let meta: [String: String] = [
+            "ung_dung": "dmx",
+            "ten_dang_nhap": taiKhoan.tenDangNhap,
+            "la_admin": laAdmin ? "true" : "false"
+        ]
+        capNhatUserSupabaseAdmin(userId: taiKhoan.id, matKhauMoi: nil, userMetadata: meta) { [weak self] kq in
+            if case .success = kq, let self, self.phien?.userId == taiKhoan.id {
+                var p = self.phien
+                p?.laAdmin = laAdmin
+                if let p {
+                    self.phien = p
+                    self.luuKeychain(p)
+                }
+            }
+            hoanTat(kq)
+        }
+    }
+
+    func adminXoaTaiKhoan(taiKhoan: ThongTinTaiKhoanDMX, hoanTat: @escaping (Result<Void, Error>) -> Void) {
+        if taiKhoan.tenDangNhap.lowercased() == "duongnt" {
+            hoanTat(.failure(NSError.dmx("Không thể xoá tài khoản Admin gốc \"duongnt\".")))
+            return
+        }
+        xoaUserVaDuLieuTrenSupabase(userId: taiKhoan.id) { [weak self] kq in
+            if case .success = kq, let self, self.phien?.userId == taiKhoan.id {
+                self.dangXuat()
+                NotificationCenter.default.post(name: .taiKhoanDMXBiDangXuat, object: nil)
+            }
+            hoanTat(kq)
+        }
+    }
+
+    func adminXoaTatCaTaiKhoanKhacGiuDuongnt(hoanTat: @escaping (Result<Int, Error>) -> Void) {
+        layDanhSachUsersSupabaseAdmin { [weak self] kq in
+            guard let self else { return }
+            switch kq {
+            case .success(let users):
+                let emailDuongnt = self.taoEmailDmx("duongnt")
+                let canXoa = users.filter { ($0.email ?? "").lowercased() != emailDuongnt }
+                let nhom = DispatchGroup()
+                var daXoa = 0
+                for u in canXoa {
+                    nhom.enter()
+                    self.xoaUserVaDuLieuTrenSupabase(userId: u.id) { r in
+                        if case .success = r { daXoa += 1 }
+                        nhom.leave()
+                    }
+                }
+                self.xoaHoSoSQLKhacDuongnt()
+                nhom.notify(queue: .main) {
+                    hoanTat(.success(daXoa))
+                }
+            case .failure(let loi):
+                DispatchQueue.main.async { hoanTat(.failure(loi)) }
+            }
+        }
+    }
+
+    private func xoaHoSoSQLKhacDuongnt() {
+        var comp = URLComponents(url: diaChiSupabase.appendingPathComponent("/rest/v1/dmx_ho_so"), resolvingAgainstBaseURL: false)!
+        comp.queryItems = [URLQueryItem(name: "ten_dang_nhap", value: "neq.duongnt")]
+        var req = URLRequest(url: comp.url!)
+        req.httpMethod = "DELETE"
+        req.setValue(khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
+    }
+
+    private func layDanhSachUsersSupabaseAdmin(hoanTat: @escaping (Result<[SupabaseAuthUser], Error>) -> Void) {
+        var comp = URLComponents(url: diaChiSupabase.appendingPathComponent("/auth/v1/admin/users"), resolvingAgainstBaseURL: false)!
+        comp.queryItems = [
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "per_page", value: "200")
+        ]
+        var req = URLRequest(url: comp.url!)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 25
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue(khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
+
+        URLSession.shared.dataTask(with: req) { data, response, error in
+            if let error {
+                DispatchQueue.main.async { hoanTat(.failure(error)) }
+                return
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status), let data else {
+                DispatchQueue.main.async { hoanTat(.failure(NSError.dmx("Không tải được danh sách tài khoản từ máy chủ."))) }
+                return
+            }
+            if let res = try? JSONDecoder().decode(DanhSachAdminUsersResponse.self, from: data), let users = res.users {
+                DispatchQueue.main.async { hoanTat(.success(users)) }
+            } else if let users = try? JSONDecoder().decode([SupabaseAuthUser].self, from: data) {
+                DispatchQueue.main.async { hoanTat(.success(users)) }
+            } else {
+                DispatchQueue.main.async { hoanTat(.success([])) }
+            }
+        }.resume()
+    }
+
+    private func capNhatUserSupabaseAdmin(
+        userId: String,
+        matKhauMoi: String?,
+        userMetadata: [String: String]?,
+        hoanTat: @escaping (Result<Void, Error>) -> Void
+    ) {
+        var payload: [String: Any] = [:]
+        if let mk = matKhauMoi, !mk.isEmpty { payload["password"] = mk }
+        if let meta = userMetadata { payload["user_metadata"] = meta }
+
+        var req = URLRequest(url: diaChiSupabase.appendingPathComponent("/auth/v1/admin/users/\(userId)"))
+        req.httpMethod = "PUT"
+        req.timeoutInterval = 25
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+
+        URLSession.shared.dataTask(with: req) { data, response, error in
+            if let error {
+                DispatchQueue.main.async { hoanTat(.failure(error)) }
+                return
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                let duLieu = data ?? Data()
+                let errObj = try? JSONDecoder().decode(SupabaseAuthError.self, from: duLieu)
+                let msg = errObj?.msg ?? errObj?.message ?? errObj?.errorDescription ?? "Không cập nhật được tài khoản."
+                DispatchQueue.main.async { hoanTat(.failure(NSError.dmx(msg))) }
+                return
+            }
+            DispatchQueue.main.async { hoanTat(.success(())) }
+        }.resume()
+    }
+
+    private func xoaUserVaDuLieuTrenSupabase(userId: String, hoanTat: @escaping (Result<Void, Error>) -> Void) {
+        var req = URLRequest(url: diaChiSupabase.appendingPathComponent("/auth/v1/admin/users/\(userId)"))
+        req.httpMethod = "DELETE"
+        req.timeoutInterval = 25
+        req.setValue(khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
+
+        URLSession.shared.dataTask(with: req) { [weak self] _, response, error in
+            guard let self else { return }
+            if let error {
+                DispatchQueue.main.async { hoanTat(.failure(error)) }
+                return
+            }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                DispatchQueue.main.async { hoanTat(.failure(NSError.dmx("Chưa xoá được tài khoản trên máy chủ."))) }
+                return
+            }
+            // Xoá file storage & dữ liệu SQL của user vừa xoá
+            var reqStorage = URLRequest(url: self.diaChiSupabase.appendingPathComponent("/storage/v1/object/\(self.tenBucket)/\(userId).json"))
+            reqStorage.httpMethod = "DELETE"
+            reqStorage.setValue(self.khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+            reqStorage.setValue("Bearer \(self.khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
+            URLSession.shared.dataTask(with: reqStorage) { _, _, _ in }.resume()
+
+            for bang in ["/rest/v1/dmx_ho_so", "/rest/v1/dmx_du_lieu_ngay"] {
+                var comp = URLComponents(url: self.diaChiSupabase.appendingPathComponent(bang), resolvingAgainstBaseURL: false)!
+                comp.queryItems = [URLQueryItem(name: "nguoi_dung_id", value: "eq.\(userId)")]
+                var reqSQL = URLRequest(url: comp.url!)
+                reqSQL.httpMethod = "DELETE"
+                reqSQL.setValue(self.khoaBiMatSupabase, forHTTPHeaderField: "apikey")
+                reqSQL.setValue("Bearer \(self.khoaBiMatSupabase)", forHTTPHeaderField: "Authorization")
+                URLSession.shared.dataTask(with: reqSQL) { _, _, _ in }.resume()
+            }
+
+            DispatchQueue.main.async { hoanTat(.success(())) }
+        }.resume()
+    }
+
+    private func dinhDangNgayISO(_ raw: String?) -> String {
+        guard let raw, !raw.isEmpty else { return "Chưa ghi nhận" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        guard let date else { return String(raw.prefix(10)) }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "vi_VN")
+        fmt.dateFormat = "HH:mm dd/MM/yyyy"
+        return fmt.string(from: date)
     }
 
     // MARK: - 3. Tải dữ liệu đồng bộ (Kết hợp Supabase Storage + Bảng SQL + Web API)
@@ -287,7 +667,6 @@ final class DichVuDongBo {
                 }
             }
 
-            // Nguồn 1: Đọc file JSON từ Supabase Storage (dmx-du-lieu/{userId}.json) - nơi Web API lưu
             if let uid = userId, !uid.isEmpty {
                 nhom.enter()
                 self.docFileStorageSupabase(userId: uid) { cloud in
@@ -295,7 +674,6 @@ final class DichVuDongBo {
                     nhom.leave()
                 }
 
-                // Nguồn 2: Đọc từ bảng SQL dmx_ho_so & dmx_du_lieu_ngay (nơi trình duyệt Web lưu trực tiếp)
                 nhom.enter()
                 self.docBangSQLSupabase(userId: uid) { cdSQL, ngaySQL in
                     gopAnToan(caiDat: cdSQL, cacNgay: ngaySQL)
@@ -303,7 +681,6 @@ final class DichVuDongBo {
                 }
             }
 
-            // Nguồn 3: Thử gọi thêm Web API /api/dmx/dong-bo (nếu web đã deploy bản mới)
             nhom.enter()
             self.guiWeb(path: "/api/dmx/dong-bo", method: "GET", bodyData: nil, canDangNhap: true) { (kq: Result<DuLieuDamMay, Error>) in
                 if case .success(let cloud) = kq {
@@ -340,10 +717,8 @@ final class DichVuDongBo {
         guard daDangNhap else { return }
         hangDoi.async { [weak self] in
             guard let self else { return }
-            // 1. Gửi qua Web API (nếu đã deploy)
             self.guiWeb(path: "/api/dmx/dong-bo", method: "POST", body: goi, canDangNhap: true) { (_: Result<LoiMayChu, Error>) in }
 
-            // 2. Đồng bộ trực tiếp lên Supabase Storage + Bảng SQL để Web đọc được ngay lập tức
             self.damBaoUserId { [weak self] userId in
                 guard let self, let uid = userId, !uid.isEmpty else { return }
                 self.ghiStorageSupabase(userId: uid, goi: goi)
@@ -439,6 +814,7 @@ final class DichVuDongBo {
             if let data, let u = try? JSONDecoder().decode(SupabaseAuthUser.self, from: data), !u.id.isEmpty {
                 if var p = self.phien {
                     p.userId = u.id
+                    p.laAdmin = self.xacDinhLaAdmin(user: u, tenDangNhap: p.tenDangNhap)
                     self.phien = p
                     self.luuKeychain(p)
                 }
@@ -476,7 +852,6 @@ final class DichVuDongBo {
         )
         guard let body = try? JSONEncoder().encode(payload) else { return }
 
-        // Đảm bảo bucket tồn tại
         var reqBucket = URLRequest(url: diaChiSupabase.appendingPathComponent("/storage/v1/bucket"))
         reqBucket.httpMethod = "POST"
         reqBucket.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -509,7 +884,6 @@ final class DichVuDongBo {
         var cdKetQua: CaiDatDMX?
         var ngayKetQua: [String: DuLieuNgayDMX] = [:]
 
-        // 1. Đọc dmx_ho_so
         nhom.enter()
         var compHoSo = URLComponents(url: diaChiSupabase.appendingPathComponent("/rest/v1/dmx_ho_so"), resolvingAgainstBaseURL: false)!
         compHoSo.queryItems = [
@@ -529,7 +903,6 @@ final class DichVuDongBo {
             nhom.leave()
         }.resume()
 
-        // 2. Đọc dmx_du_lieu_ngay
         nhom.enter()
         var compNgay = URLComponents(url: diaChiSupabase.appendingPathComponent("/rest/v1/dmx_du_lieu_ngay"), resolvingAgainstBaseURL: false)!
         compNgay.queryItems = [
@@ -607,12 +980,15 @@ final class DichVuDongBo {
                let token = authRes.accessToken,
                let refreshMoi = authRes.refreshToken {
                 let exp = authRes.expiresAt ?? (Int(Date().timeIntervalSince1970) + (authRes.expiresIn ?? 3600))
+                let ten = authRes.user?.userMetadata?["ten_dang_nhap"] ?? self.tenDangNhap
+                let laAdminQuyen = authRes.user.map { self.xacDinhLaAdmin(user: $0, tenDangNhap: ten) } ?? self.laAdmin
                 let moi = PhienDangNhapDMX(
                     accessToken: token,
                     refreshToken: refreshMoi,
                     expiresAt: exp,
                     userId: authRes.user?.id ?? self.phien?.userId,
-                    tenDangNhap: authRes.user?.userMetadata?["ten_dang_nhap"] ?? self.tenDangNhap
+                    tenDangNhap: ten,
+                    laAdmin: laAdminQuyen
                 )
                 self.phien = moi
                 self.luuKeychain(moi)
@@ -701,6 +1077,7 @@ final class DichVuDongBo {
 
 extension Notification.Name {
     static let duLieuDMXDaDongBo = Notification.Name("duLieuDMXDaDongBo")
+    static let taiKhoanDMXBiDangXuat = Notification.Name("taiKhoanDMXBiDangXuat")
 }
 
 private extension NSError {

@@ -14,9 +14,27 @@ struct KetQuaThiDuaNhanVienKhoi: Hashable {
     var danhSach: [DongThiDuaNhanVienQuet]
 }
 
+struct KetQuaQuetTatCaAnh {
+    var doanhThu: ThongTinDoanhThu?
+    var soAnhDoanhThu: Int = 0
+    var danhSachThiDua: [DongThiDua] = []
+    var soAnhThiDua: Int = 0
+    var doanhThuNhanVien: [DoanhThuNhanVienItem] = []
+    var soAnhDoanhThuNV: Int = 0
+    var thiDuaNhanVien: [KetQuaThiDuaNhanVienKhoi] = []
+    var soAnhThiDuaNV: Int = 0
+    var capNhatLuc: String = ""
+    var thongTinDonVi: String = ""
+
+    var coDuLieu: Bool {
+        doanhThu != nil || !danhSachThiDua.isEmpty || !doanhThuNhanVien.isEmpty || !thiDuaNhanVien.isEmpty
+    }
+}
+
 struct KetQuaQuetThiDua {
     var danhSach: [DongThiDua]
     var thiDuaNhanVien: [KetQuaThiDuaNhanVienKhoi]
+    var doanhThuQuetDuoc: ThongTinDoanhThu? = nil
     var capNhatLuc: String
     var thongTinDonVi: String
 }
@@ -35,9 +53,114 @@ final class DichVuDocAnh {
 
     // MARK: - 1. Quét danh sách ảnh chụp màn hình Thi Đua (hỗ trợ cả ảnh bảng Thực hiện NV nếu chọn lẫn)
 
+    func quetVaPhanLoaiTatCaAnh(
+        danhSachAnh: [UIImage],
+        ngay: Date,
+        cheDoDangChon: LoaiCheDoDoanhThu,
+        tienTrinh: @escaping (String) -> Void,
+        hoanTat: @escaping (KetQuaQuetTatCaAnh) -> Void
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            var ketQua = KetQuaQuetTatCaAnh()
+            var dtGop = ThongTinDoanhThu()
+            var coDT = false
+            var cacPhanTuThiDua: [([PhanTuVanBan], String?)] = []
+
+            for (chiSo, anh) in danhSachAnh.enumerated() {
+                DispatchQueue.main.async {
+                    tienTrinh("Đang đọc & phân loại ảnh \(chiSo + 1)/\(danhSachAnh.count)...")
+                }
+                let phanTu = self.thucHienOCR(anh: anh)
+                let (cn, dv, wm) = self.trichThongTinChungThiDua(phanTu: phanTu)
+                if ketQua.capNhatLuc.isEmpty, let cn, !cn.isEmpty { ketQua.capNhatLuc = cn }
+                if ketQua.thongTinDonVi.isEmpty, let dv, !dv.isEmpty { ketQua.thongTinDonVi = dv }
+
+                // 1. Kiểm tra bảng Doanh thu Nhân viên
+                let dtnv = self.phanTichDoanhThuNhanVienOffline(phanTu: phanTu)
+                if dtnv.count >= 2 {
+                    ketQua.doanhThuNhanVien.append(contentsOf: dtnv)
+                    ketQua.soAnhDoanhThuNV += 1
+                    continue
+                }
+
+                // 2. Kiểm tra bảng Thực hiện Nhân viên theo ngành
+                let coCotHangTrongST = phanTu.contains { pt in
+                    let u = self.boDau(pt.chu)
+                    return pt.y < 0.22 && (
+                        u.contains("HANG TRONG") ||
+                        u.contains("TOP/BOTT") ||
+                        u.contains("CON / VUOT") ||
+                        u.contains("NHAN VIEN")
+                    )
+                }
+                if coCotHangTrongST,
+                   let khoiNV = self.phanTichThiDuaNhanVienOffline(phanTu: phanTu, tenNganhGoiY: nil, watermark: wm),
+                   !khoiNV.danhSach.isEmpty {
+                    ketQua.thiDuaNhanVien.append(khoiNV)
+                    ketQua.soAnhThiDuaNV += 1
+                    continue
+                }
+
+                // 3. Kiểm tra thẻ Thi đua 2 cột
+                let dsLuoiThe = self.phanTichThiDuaLuoiThe2Cot(phanTu: phanTu, watermark: wm)
+                if !dsLuoiThe.isEmpty {
+                    ketQua.danhSachThiDua = KhoDuLieu.gopDanhSachThiDua(cu: ketQua.danhSachThiDua, moi: dsLuoiThe)
+                    ketQua.soAnhThiDua += 1
+                    continue
+                }
+
+                // 4. Kiểm tra ảnh Doanh thu siêu thị (DT Thực / DT Quy đổi)
+                let kqDT = self.phanTichDoanhThu(phanTu: phanTu)
+                if kqDT.doanhThuThuc > 0 || kqDT.doanhThuQuyDoi > 0 {
+                    dtGop = dtGop.gop(voi: kqDT, laRealtime: cheDoDangChon == .realtime)
+                    coDT = true
+                    ketQua.soAnhDoanhThu += 1
+                    continue
+                }
+
+                cacPhanTuThiDua.append((phanTu, wm))
+            }
+
+            if !cacPhanTuThiDua.isEmpty {
+                var idx = 0
+                while idx < cacPhanTuThiDua.count {
+                    let (pt1, wm1) = cacPhanTuThiDua[idx]
+                    if idx + 1 < cacPhanTuThiDua.count {
+                        let (pt2, wm2) = cacPhanTuThiDua[idx + 1]
+                        let dsCap = self.ghepCapAnhThiDua(phanTu1: pt1, watermark1: wm1, phanTu2: pt2, watermark2: wm2)
+                        if !dsCap.isEmpty {
+                            ketQua.danhSachThiDua = KhoDuLieu.gopDanhSachThiDua(cu: ketQua.danhSachThiDua, moi: dsCap)
+                            ketQua.soAnhThiDua += 2
+                        }
+                        idx += 2
+                    } else {
+                        let (ds1, _, _, _) = self.phanTichThiDuaOffline(phanTu: pt1, tenNganhGoiY: nil)
+                        if !ds1.isEmpty {
+                            ketQua.danhSachThiDua = KhoDuLieu.gopDanhSachThiDua(cu: ketQua.danhSachThiDua, moi: ds1)
+                            ketQua.soAnhThiDua += 1
+                        }
+                        idx += 1
+                    }
+                }
+            }
+
+            if coDT {
+                ketQua.doanhThu = dtGop
+            }
+            if ketQua.capNhatLuc.isEmpty {
+                ketQua.capNhatLuc = TienIchNgay.hienThiGioPhut.string(from: Date())
+            }
+
+            DispatchQueue.main.async {
+                hoanTat(ketQua)
+            }
+        }
+    }
+
     func quetAnhThiDua(
         danhSachAnh: [UIImage],
         danhSachHienCo: [DongThiDua] = [],
+        laRealtime: Bool = false,
         tenNganhGoiY: String? = nil,
         tienTrinh: @escaping (String) -> Void,
         hoanTat: @escaping (KetQuaQuetThiDua) -> Void
@@ -181,6 +304,7 @@ final class DichVuDocAnh {
 
     func quetAnhDoanhThu(
         danhSachAnh: [UIImage],
+        laRealtime: Bool = false,
         tienTrinh: ((String) -> Void)? = nil,
         hoanTat: @escaping (ThongTinDoanhThu) -> Void
     ) {
@@ -192,7 +316,7 @@ final class DichVuDocAnh {
                 }
                 let phanTu = self.thucHienOCR(anh: anh)
                 let kqAnh = self.phanTichDoanhThu(phanTu: phanTu)
-                ketQuaGop = ketQuaGop.gop(voi: kqAnh)
+                ketQuaGop = ketQuaGop.gop(voi: kqAnh, laRealtime: laRealtime)
             }
             DispatchQueue.main.async {
                 hoanTat(ketQuaGop)
