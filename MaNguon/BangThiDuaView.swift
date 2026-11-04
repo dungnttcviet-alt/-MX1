@@ -2342,6 +2342,7 @@ final class BangTongHopRealtimeThangView: UIView, UITableViewDataSource, UITable
     var khiBamQuetDoanhThuNVRealtime: (() -> Void)?
     var khiDoiCheDoBieuDo: ((LoaiBieuDoMuc) -> Void)?
     var khiChonNhanVienSucKhoe: ((TongHopNhanVien) -> Void)?
+    var khiChiaSeAnhSucKhoe: ((UIImage) -> Void)?
     private let soDongTongKetCuoiBang = 3
 
     private(set) var cheDoBieuDoHienTai: LoaiBieuDoMuc = .bieuDoRealtime
@@ -2730,17 +2731,27 @@ final class BangTongHopRealtimeThangView: UIView, UITableViewDataSource, UITable
         chonCheDoNgaySK.addTarget(self, action: #selector(doiCheDoLocNgay(_:)), for: .valueChanged)
         chonCheDoNgaySK.setContentHuggingPriority(.required, for: .horizontal)
 
+        let nutXuatAnhSK = UIButton(type: .system)
+        nutXuatAnhSK.setTitle("📸 Xuất ảnh SK", for: .normal)
+        nutXuatAnhSK.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
+        nutXuatAnhSK.backgroundColor = UIColor.systemRed.withAlphaComponent(0.12)
+        nutXuatAnhSK.tintColor = UIColor(red: 0.82, green: 0.12, blue: 0.12, alpha: 1)
+        nutXuatAnhSK.layer.cornerRadius = 7
+        nutXuatAnhSK.contentEdgeInsets = UIEdgeInsets(top: 5, left: 7, bottom: 5, right: 7)
+        nutXuatAnhSK.addTarget(self, action: #selector(bamXuatAnhSucKhoe), for: .touchUpInside)
+        nutXuatAnhSK.setContentHuggingPriority(.required, for: .horizontal)
+
         let nutQuetDTNV = UIButton(type: .system)
         nutQuetDTNV.setTitle("📷 Quét DT NV ngày", for: .normal)
-        nutQuetDTNV.titleLabel?.font = .systemFont(ofSize: 11.5, weight: .bold)
+        nutQuetDTNV.titleLabel?.font = .systemFont(ofSize: 11, weight: .bold)
         nutQuetDTNV.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.12)
         nutQuetDTNV.tintColor = .systemBlue
         nutQuetDTNV.layer.cornerRadius = 7
-        nutQuetDTNV.contentEdgeInsets = UIEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+        nutQuetDTNV.contentEdgeInsets = UIEdgeInsets(top: 5, left: 7, bottom: 5, right: 7)
         nutQuetDTNV.addTarget(self, action: #selector(bamQuetDoanhThuNVNgay), for: .touchUpInside)
         nutQuetDTNV.setContentHuggingPriority(.required, for: .horizontal)
 
-        let hangTieuDeSK = UIStackView(arrangedSubviews: [lbTieuDeSK, nutQuetDTNV])
+        let hangTieuDeSK = UIStackView(arrangedSubviews: [lbTieuDeSK, nutXuatAnhSK, nutQuetDTNV])
         hangTieuDeSK.axis = .horizontal
         hangTieuDeSK.spacing = 6
         hangTieuDeSK.alignment = .center
@@ -3083,6 +3094,17 @@ final class BangTongHopRealtimeThangView: UIView, UITableViewDataSource, UITable
         khiBamQuetDoanhThuNVRealtime?()
     }
 
+    @objc private func bamXuatAnhSucKhoe() {
+        let dl = KhoDuLieu.dungChung.duLieu(cho: ngayHienTai)
+        if let anh = taoAnhBaoCaoSucKhoeNhanVien(
+            ngay: ngayHienTai,
+            thongTinDonVi: dl.thongTinDonVi,
+            capNhatLuc: dl.capNhatLuc
+        ) {
+            khiChiaSeAnhSucKhoe?(anh)
+        }
+    }
+
     @objc private func bamXemChiTietMonNhanVien() {
         let maChon = baoCaoSucBan?.nhanVienDangChon.maNV ?? maNVDangChon
         let dsTH = KhoDuLieu.dungChung.tongHopNhanVien(den: ngayHienTai, sapXep: .doanhThuQD, cheDo: .luyKe)
@@ -3178,6 +3200,8 @@ final class BangTongHopRealtimeThangView: UIView, UITableViewDataSource, UITable
         nhanPhuDeCanhBaoYeu.text = "Top \(ds5CanhBao.count) nhân viên yếu liên tục nhiều ngày nhất trong đội ngũ \(bc.danhSachNhanVien.count) nhân viên (Chuẩn bình quân: \(bc.tongKetNhanVienDangChon.tyLeChuanBinhQuan.chuoiPhanTram)/NV):"
 
         let thang = TienIchNgay.lich.component(.month, from: ngayHienTai)
+        let baoCaoHoSo = KhoDuLieu.dungChung.tinhBaoCaoSucKhoeNhanVien(den: ngayHienTai, cheDo: .luyKe)
+        let mapHoSo = Dictionary(uniqueKeysWithValues: baoCaoHoSo.danhSachTatCa.map { ($0.nhanVien.maNV, $0) })
 
         for (idx, cb) in ds5CanhBao.enumerated() {
             let dangChon = (cb.nhanVien.maNV == bc.nhanVienDangChon.maNV)
@@ -3235,11 +3259,20 @@ final class BangTongHopRealtimeThangView: UIView, UITableViewDataSource, UITable
                 return String(format: "%@%02d/%02d:%@", icon, d.ngayTrongThang, thang, d.tyLeDongGopNgay.chuoiPhanTram)
             }.joined(separator: "  ")
 
+            let hoSoNV = mapHoSo[cb.nhanVien.maNV]
+            let thongTinMon: String
+            if let hs = hoSoNV, hs.tongHopHienTai.tongMonGiao > 0 {
+                let nganhYeu = hs.cacMonYeuNhat.isEmpty ? "Đạt các môn" : hs.cacMonYeuNhat.joined(separator: ", ")
+                thongTinMon = "\n📊 Điểm SK: \(hs.diemSucKhoe.chuoiPhanTram)  •  Môn đạt: \(hs.tongHopHienTai.soMonDat)/\(hs.tongHopHienTai.tongMonGiao)  •  🎯 Ngành yếu cần kèm: \(nganhYeu)"
+            } else {
+                thongTinMon = ""
+            }
+
             let lbPhu = UILabel()
-            lbPhu.text = "Tổng ngày yếu: \(cb.soNgayYeu)/\(max(1, cb.soNgayCoSoDoi)) ngày  •  DT QĐ: \(cb.tongDoanhThuQDThang.chuoiSoVN)  •  Đóng góp TB: \(cb.tyLeDongGopTBThang.chuoiPhanTram) (Chuẩn: \(cb.tyLeChuanBinhQuan.chuoiPhanTram))\nLịch sử ngày: \(chuoiNgayGanNhat)"
+            lbPhu.text = "Tổng ngày yếu: \(cb.soNgayYeu)/\(max(1, cb.soNgayCoSoDoi)) ngày  •  DT QĐ: \(cb.tongDoanhThuQDThang.chuoiSoVN)  •  Đóng góp TB: \(cb.tyLeDongGopTBThang.chuoiPhanTram) (Chuẩn: \(cb.tyLeChuanBinhQuan.chuoiPhanTram))\n🗓️ Lịch sử ngày: \(chuoiNgayGanNhat)\(thongTinMon)"
             lbPhu.font = .monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
             lbPhu.textColor = .secondaryLabel
-            lbPhu.numberOfLines = 2
+            lbPhu.numberOfLines = 3
             lbPhu.isUserInteractionEnabled = false
 
             let nganThe = UIStackView(arrangedSubviews: [hang1, lbPhu])

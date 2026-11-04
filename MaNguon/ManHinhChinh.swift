@@ -276,6 +276,9 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate {
             guard let self = self else { return }
             self.navigationController?.pushViewController(ManHinhChiTietNhanVien(nv, ngay: self.ngayHienTai), animated: true)
         }
+        bangRealtimeThang.khiChiaSeAnhSucKhoe = { [weak self] anh in
+            self?.chiaSe([anh])
+        }
 
         taoGiaoDienKhungDuPhong()
 

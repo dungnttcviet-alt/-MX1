@@ -272,6 +272,60 @@ struct KetQuaPhanTichSucKhoeDoiNgu: Hashable {
     var soNVYeu: Int = 0
 }
 
+struct DiemSucKhoeNgayNV: Hashable {
+    var khoaNgay: String
+    var ngayTrongThang: Int
+    var nhanNgay: String
+    var diemSucKhoe: Double
+    var mucDo: MucDoSucKhoeNV
+    var soMonDat: Int
+    var tongMonGiao: Int
+    var phanTramHTTB: Double
+    var doanhThuQD: Double
+}
+
+struct HoSoSucKhoeNhanVien: Hashable {
+    var nhanVien: NhanVienQuanLy
+    var tongHopHienTai: TongHopNhanVien
+    var diemSucKhoe: Double
+    var mucDo: MucDoSucKhoeNV
+    var soNgayYeuLienTuc: Int
+    var chuoiYeuDaiNhat: Int
+    var tongSoNgayYeu: Int
+    var tongSoNgayCoSo: Int
+    var lichSuNgay: [DiemSucKhoeNgayNV]
+    var cacMonYeuNhat: [String]
+    var xuHuongDiem: Double
+    var laCanhBaoTop5: Bool
+    var hangCanhBao: Int
+
+    var chuoiCanhBaoYeu: String {
+        if soNgayYeuLienTuc >= 2 {
+            return "🚨 Yếu \(soNgayYeuLienTuc) ngày liên tục"
+        }
+        if chuoiYeuDaiNhat >= 2 {
+            return "⚠️ Đã yếu \(chuoiYeuDaiNhat) ngày liên tục"
+        }
+        if soNgayYeuLienTuc == 1 {
+            return "⚠️ Yếu 1 ngày gần nhất"
+        }
+        return "⚠️ Điểm SK thấp (\(diemSucKhoe.chuoiPhanTram))"
+    }
+}
+
+struct BaoCaoSucKhoeDoiNgu: Hashable {
+    var ngayBaoCao: Date
+    var cheDo: LoaiCheDoDoanhThu
+    var soNgayDaTheoDoi: Int
+    var cacNhanNgayTheoDoi: [String]
+    var soNVKhoe: Int
+    var soNVTrungBinh: Int
+    var soNVYeu: Int
+    var diemTrungBinhDoiNgu: Double
+    var top5CanhBaoYeu: [HoSoSucKhoeNhanVien]
+    var danhSachTatCa: [HoSoSucKhoeNhanVien]
+}
+
 struct DuBaoQuyDoiThang: Hashable {
     var tongDTThucRealtime: Double = 0
     var tongDTQuyDoiRealtime: Double = 0
@@ -975,6 +1029,9 @@ final class ThuMucDuLieu {
     }()
 
     private let giaiMa = JSONDecoder()
+    private let hangDoiGhiFile = DispatchQueue(label: "com.thanhduong.tonghopdmx.ghifile", qos: .utility)
+    private var congViecGhiNgay: DispatchWorkItem?
+    private var congViecGhiCaiDat: DispatchWorkItem?
 
     private init() {
         let documents = FileManager.default.urls(
@@ -1003,6 +1060,26 @@ final class ThuMucDuLieu {
         } catch {
             return false
         }
+    }
+
+    func ghiNgayBatDongBo(_ cacNgay: [String: DuLieuNgayDMX]) {
+        congViecGhiNgay?.cancel()
+        let cv = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.ghi(cacNgay, vao: self.tepNgay)
+        }
+        congViecGhiNgay = cv
+        hangDoiGhiFile.asyncAfter(deadline: .now() + 0.15, execute: cv)
+    }
+
+    func ghiCaiDatBatDongBo(_ caiDat: CaiDatDMX) {
+        congViecGhiCaiDat?.cancel()
+        let cv = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.ghi(caiDat, vao: self.tepCaiDat)
+        }
+        congViecGhiCaiDat = cv
+        hangDoiGhiFile.asyncAfter(deadline: .now() + 0.10, execute: cv)
     }
 }
 
@@ -1135,7 +1212,70 @@ final class KhoDuLieu {
         )
     }
 
-    /// Phân tích tổng hợp Sức khỏe 16 Nhân viên (60% Doanh thu QĐ + 40% Môn thi đua) & Cảnh báo 5 nhân viên yếu nhiều ngày liên tục
+    /// Tính báo cáo Hồ sơ Sức khỏe Nhân viên & Cảnh báo Top 5 yếu liên tục (hỗ trợ cả Lũy kế & Realtime, kèm các ngành yếu cần kèm cặp)
+    func tinhBaoCaoSucKhoeNhanVien(den ngay: Date, cheDo: LoaiCheDoDoanhThu = .luyKe) -> BaoCaoSucKhoeDoiNgu {
+        let kq = phanTichSucKhoeNhanVienThang(den: ngay)
+        let thang = TienIchNgay.lich.component(.month, from: ngay)
+        let dsHoSo: [HoSoSucKhoeNhanVien] = kq.danhSachTheoCanhBao.map { item in
+            let th = (cheDo == .luyKe) ? item.tongHopLuyKe : item.tongHopRealtime
+            let cacMonYeu = th.cacMonGiao
+                .filter { !$0.daDat }
+                .sorted { $0.phanTramHT < $1.phanTramHT }
+                .prefix(3)
+                .map { "\($0.tenNganhHang) (\($0.phanTramHT.chuoiPhanTram))" }
+            let lichSu: [DiemSucKhoeNgayNV] = item.lichSuNgay.map { d in
+                let md: MucDoSucKhoeNV = d.laNgayYeu ? .yeuBaoDong : (d.diemSucKhoe >= 75 ? .khoe : .canChuY)
+                return DiemSucKhoeNgayNV(
+                    khoaNgay: d.khoaNgay,
+                    ngayTrongThang: d.ngayTrongThang,
+                    nhanNgay: String(format: "%02d/%02d", d.ngayTrongThang, thang),
+                    diemSucKhoe: d.diemSucKhoe,
+                    mucDo: md,
+                    soMonDat: th.soMonDat,
+                    tongMonGiao: th.tongMonGiao,
+                    phanTramHTTB: d.phanTramHTMon,
+                    doanhThuQD: d.doanhThuQD
+                )
+            }
+            let xuHuong: Double
+            if lichSu.count >= 2 {
+                xuHuong = lichSu.last!.diemSucKhoe - lichSu[lichSu.count - 2].diemSucKhoe
+            } else {
+                xuHuong = 0
+            }
+            return HoSoSucKhoeNhanVien(
+                nhanVien: item.nhanVien,
+                tongHopHienTai: th,
+                diemSucKhoe: item.diemSucKhoe,
+                mucDo: item.mucDo,
+                soNgayYeuLienTuc: item.soNgayYeuLienTuc,
+                chuoiYeuDaiNhat: max(item.soNgayYeuLienTuc, item.tongSoNgayYeu),
+                tongSoNgayYeu: item.tongSoNgayYeu,
+                tongSoNgayCoSo: item.soNgayCoDuLieu,
+                lichSuNgay: lichSu,
+                cacMonYeuNhat: Array(cacMonYeu),
+                xuHuongDiem: xuHuong,
+                laCanhBaoTop5: item.laTop5CanhBao,
+                hangCanhBao: item.thuHangCanhBao
+            )
+        }
+        let top5 = dsHoSo.filter { $0.laCanhBaoTop5 }
+        let cacNhanNgay = (dsHoSo.first?.lichSuNgay ?? []).map { $0.nhanNgay }
+        return BaoCaoSucKhoeDoiNgu(
+            ngayBaoCao: ngay,
+            cheDo: cheDo,
+            soNgayDaTheoDoi: kq.soNgayCoDuLieu,
+            cacNhanNgayTheoDoi: cacNhanNgay,
+            soNVKhoe: kq.soNVKhoe,
+            soNVTrungBinh: kq.soNVKha + kq.soNVCanChuY,
+            soNVYeu: kq.soNVYeu,
+            diemTrungBinhDoiNgu: kq.trungBinhDiemSucKhoe,
+            top5CanhBaoYeu: top5,
+            danhSachTatCa: dsHoSo
+        )
+    }
+
+        /// Phân tích tổng hợp Sức khỏe 16 Nhân viên (60% Doanh thu QĐ + 40% Môn thi đua) & Cảnh báo 5 nhân viên yếu nhiều ngày liên tục
     func phanTichSucKhoeNhanVienThang(den ngay: Date) -> KetQuaPhanTichSucKhoeDoiNgu {
         let baoCaoSucBan = baoCaoSucBanNhanVienTheoNgayTrongThang(cho: ngay)
         let dsTongHopLK = tongHopNhanVien(den: ngay, sapXep: .doanhThuQD, cheDo: .luyKe)
@@ -1320,16 +1460,40 @@ final class KhoDuLieu {
 
     // MARK: - Theo dõi sức bán nhân viên theo ngày (lấy từ Doanh thu Realtime Nhân viên) & Cảnh báo nhiều ngày yếu liên tục
 
-    /// Lấy danh sách Doanh thu Realtime Nhân viên của 1 ngày (ưu tiên `doanhThuNhanVienRealtime`, dự phòng sang `doanhThuNhanVien` nếu toàn tháng chưa quét bản Realtime riêng)
+    /// Lấy danh sách Doanh thu / Hiệu suất Nhân viên của 1 ngày (ưu tiên `doanhThuNhanVienRealtime`, dự phòng sang `doanhThuNhanVien` hoặc tổng hợp từ `thiDuaNhanVienRealtime` / `thiDuaNhanVien`)
     func danhSachDoanhThuNVRealtimeCuaNgay(khoaNgay: String, coRealtimeNVTrongThang: Bool) -> [DoanhThuNhanVienItem] {
         guard let dl = cacNgay[khoaNgay] else { return [] }
         if !dl.doanhThuNhanVienRealtime.isEmpty {
             return dl.doanhThuNhanVienRealtime
         }
-        if !coRealtimeNVTrongThang && !dl.doanhThuNhanVien.isEmpty {
+        if !dl.doanhThuNhanVien.isEmpty {
             return dl.doanhThuNhanVien
         }
-        return []
+        let bangThiDua = !dl.thiDuaNhanVienRealtime.isEmpty ? dl.thiDuaNhanVienRealtime : dl.thiDuaNhanVien
+        guard !bangThiDua.isEmpty else { return [] }
+        let dsNV = caiDat.danhSachNhanVien.isEmpty ? CaiDatDMX.nhanVienMau : caiDat.danhSachNhanVien
+        var tongTheoMa: [String: Double] = [:]
+        var soMonCoSoTheoMa: [String: Double] = [:]
+        for (_, bangNV) in bangThiDua {
+            for (ma, giaTri) in bangNV where giaTri > 0 {
+                let maChuan = Self.chuanHoaMaNV(ma)
+                tongTheoMa[maChuan, default: 0] += giaTri
+                soMonCoSoTheoMa[maChuan, default: 0] += 1
+            }
+        }
+        guard !tongTheoMa.isEmpty else { return [] }
+        return dsNV.compactMap { nv in
+            let tong = tongTheoMa[nv.maNV] ?? 0
+            let soMon = soMonCoSoTheoMa[nv.maNV] ?? 0
+            return DoanhThuNhanVienItem(
+                maNV: nv.maNV,
+                hoTen: nv.hoTen,
+                soLuong: soMon,
+                doanhThuThuc: tong,
+                doanhThuQD: tong,
+                dtTraThangQD: tong
+            )
+        }
     }
 
     /// Tổng hợp báo cáo sức bán nhân viên theo từng ngày trong tháng & phát hiện nhân viên yếu nhiều ngày liên tục
@@ -1708,7 +1872,7 @@ final class KhoDuLieu {
         }
 
         cacNgay[banLuu.khoaNgay] = banLuu
-        ThuMucDuLieu.dungChung.ghi(cacNgay, vao: ThuMucDuLieu.dungChung.tepNgay)
+        ThuMucDuLieu.dungChung.ghiNgayBatDongBo(cacNgay)
         DichVuDongBo.dungChung.dayDuLieuNgay(banLuu)
     }
 
@@ -2278,5 +2442,182 @@ extension Double {
             return String(format: "%.0f%%", self)
         }
         return String(format: "%.1f%%", self)
+    }
+}
+
+
+// MARK: - Hộp Chọn Menu Nhanh (Bottom Sheet mượt mà trên cả iPhone & iPad)
+
+struct MucChonDMX {
+    enum KieuMuc {
+        case macDinh
+        case nguyHiem
+        case huy
+    }
+    var tieuDe: String
+    var kieu: KieuMuc = .macDinh
+    var dangChon: Bool = false
+    var xuLy: (() -> Void)?
+}
+
+final class HopChonDMXController: UIViewController {
+    private let tieuDeMenu: String?
+    private let thongDiepMenu: String?
+    private let cacMuc: [MucChonDMX]
+    private let canGiuaText: Bool
+
+    private let nenMo = UIControl()
+    private let khungChinh = UIView()
+    private let khungDanhSach = UIStackView()
+    private let khungNutHuy = UIButton(type: .system)
+
+    init(tieuDe: String?, thongDiep: String? = nil, cacMuc: [MucChonDMX], canGiuaText: Bool = false) {
+        self.tieuDeMenu = tieuDe
+        self.thongDiepMenu = thongDiep
+        self.cacMuc = cacMuc
+        self.canGiuaText = canGiuaText
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        taoGiaoDien()
+    }
+
+    private func taoGiaoDien() {
+        view.backgroundColor = .clear
+        nenMo.backgroundColor = UIColor.black.withAlphaComponent(0.38)
+        nenMo.addTarget(self, action: #selector(bamDong), for: .touchUpInside)
+        nenMo.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(nenMo)
+
+        khungChinh.backgroundColor = .secondarySystemGroupedBackground
+        khungChinh.layer.cornerRadius = 16
+        khungChinh.clipsToBounds = true
+        khungChinh.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(khungChinh)
+
+        let cuon = UIScrollView()
+        cuon.translatesAutoresizingMaskIntoConstraints = false
+        khungChinh.addSubview(cuon)
+
+        khungDanhSach.axis = .vertical
+        khungDanhSach.spacing = 0
+        khungDanhSach.translatesAutoresizingMaskIntoConstraints = false
+        cuon.addSubview(khungDanhSach)
+
+        if let td = tieuDeMenu, !td.isEmpty {
+            let lb = UILabel()
+            lb.text = td
+            lb.font = .systemFont(ofSize: 13.5, weight: .bold)
+            lb.textColor = .secondaryLabel
+            lb.textAlignment = .center
+            lb.numberOfLines = 0
+            let v = UIView()
+            lb.translatesAutoresizingMaskIntoConstraints = false
+            v.addSubview(lb)
+            NSLayoutConstraint.activate([
+                lb.topAnchor.constraint(equalTo: v.topAnchor, constant: 12),
+                lb.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+                lb.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
+                lb.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -8)
+            ])
+            khungDanhSach.addArrangedSubview(v)
+        }
+
+        if let msg = thongDiepMenu, !msg.isEmpty {
+            let lb = UILabel()
+            lb.text = msg
+            lb.font = .systemFont(ofSize: 12)
+            lb.textColor = .secondaryLabel
+            lb.textAlignment = .center
+            lb.numberOfLines = 0
+            let v = UIView()
+            lb.translatesAutoresizingMaskIntoConstraints = false
+            v.addSubview(lb)
+            NSLayoutConstraint.activate([
+                lb.topAnchor.constraint(equalTo: v.topAnchor, constant: 2),
+                lb.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: 16),
+                lb.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -16),
+                lb.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -10)
+            ])
+            khungDanhSach.addArrangedSubview(v)
+        }
+
+        for muc in cacMuc where muc.kieu != .huy {
+            let vach = UIView()
+            vach.backgroundColor = .separator
+            vach.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
+            khungDanhSach.addArrangedSubview(vach)
+
+            let nut = UIButton(type: .system)
+            let chuHienThi = muc.dangChon ? "✓ \(muc.tieuDe)" : muc.tieuDe
+            nut.setTitle(chuHienThi, for: .normal)
+            nut.titleLabel?.font = .systemFont(ofSize: 15, weight: muc.dangChon ? .bold : .semibold)
+            nut.contentHorizontalAlignment = canGiuaText ? .center : .left
+            nut.contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+            nut.tintColor = (muc.kieu == .nguyHiem) ? .systemRed : .systemBlue
+            nut.addAction(UIAction { [weak self] _ in
+                self?.dismiss(animated: true) {
+                    muc.xuLy?()
+                }
+            }, for: .touchUpInside)
+            khungDanhSach.addArrangedSubview(nut)
+        }
+
+        khungNutHuy.setTitle("Đóng", for: .normal)
+        khungNutHuy.titleLabel?.font = .systemFont(ofSize: 16, weight: .bold)
+        khungNutHuy.backgroundColor = .secondarySystemGroupedBackground
+        khungNutHuy.tintColor = .systemBlue
+        khungNutHuy.layer.cornerRadius = 14
+        khungNutHuy.addTarget(self, action: #selector(bamDong), for: .touchUpInside)
+        khungNutHuy.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(khungNutHuy)
+
+        NSLayoutConstraint.activate([
+            nenMo.topAnchor.constraint(equalTo: view.topAnchor),
+            nenMo.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            nenMo.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            nenMo.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            khungNutHuy.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            khungNutHuy.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            khungNutHuy.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            khungNutHuy.heightAnchor.constraint(equalToConstant: 50),
+
+            khungChinh.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            khungChinh.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+            khungChinh.bottomAnchor.constraint(equalTo: khungNutHuy.topAnchor, constant: -8),
+            khungChinh.heightAnchor.constraint(lessThanOrEqualTo: view.heightAnchor, multiplier: 0.72),
+
+            cuon.topAnchor.constraint(equalTo: khungChinh.topAnchor),
+            cuon.leadingAnchor.constraint(equalTo: khungChinh.leadingAnchor),
+            cuon.trailingAnchor.constraint(equalTo: khungChinh.trailingAnchor),
+            cuon.bottomAnchor.constraint(equalTo: khungChinh.bottomAnchor),
+            cuon.heightAnchor.constraint(equalTo: khungDanhSach.heightAnchor).withPriority(.defaultLow),
+
+            khungDanhSach.topAnchor.constraint(equalTo: cuon.contentLayoutGuide.topAnchor),
+            khungDanhSach.leadingAnchor.constraint(equalTo: cuon.contentLayoutGuide.leadingAnchor),
+            khungDanhSach.trailingAnchor.constraint(equalTo: cuon.contentLayoutGuide.trailingAnchor),
+            khungDanhSach.bottomAnchor.constraint(equalTo: cuon.contentLayoutGuide.bottomAnchor),
+            khungDanhSach.widthAnchor.constraint(equalTo: cuon.frameLayoutGuide.widthAnchor)
+        ])
+    }
+
+    @objc private func bamDong() {
+        dismiss(animated: true)
+    }
+}
+
+private extension NSLayoutConstraint {
+    func withPriority(_ p: UILayoutPriority) -> NSLayoutConstraint {
+        priority = p
+        return self
     }
 }
