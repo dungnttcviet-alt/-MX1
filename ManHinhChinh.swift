@@ -462,10 +462,9 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
     private lazy var manHinhQuanTriNhung = ManHinhQuanLyTaiKhoan()
     private let khungTrinhDuyet = UIView()
     private lazy var manHinhTrinhDuyetNhung = ManHinhTrinhDuyet(ngay: ngayHienTai)
-    private let khungMarketing = UIView()
-    private lazy var manHinhMarketingNhung = ManHinhMarketing()
     private let khungMucMoRong = UIView()
     private let bangGuiBaoCao = BangGuiBaoCaoView()
+    private let bangTruyenThongMXH = BangTruyenThongMXHView()
     private let bieuTuongMucMoRong = UIImageView()
     private let nhanTieuDeMucMoRong = UILabel()
     private let nhanMoTaMucMoRong = UILabel()
@@ -1283,7 +1282,6 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
         taoKhungTaiKhoanHopThu()
         taoKhungQuanTri()
         taoKhungTrinhDuyet()
-        taoKhungMarketing()
         taoKhungMucMoRong()
         taoMenuTruotBenTrai()
         taoLopPhuTienTrinh()
@@ -2881,29 +2879,6 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
         ])
     }
 
-    private func taoKhungMarketing() {
-        khungMarketing.backgroundColor = BangMauBCTD.nenTrang
-        khungMarketing.isHidden = true
-        khungMarketing.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(khungMarketing)
-
-        addChild(manHinhMarketingNhung)
-        manHinhMarketingNhung.view.translatesAutoresizingMaskIntoConstraints = false
-        khungMarketing.addSubview(manHinhMarketingNhung.view)
-        manHinhMarketingNhung.didMove(toParent: self)
-
-        NSLayoutConstraint.activate([
-            khungMarketing.topAnchor.constraint(equalTo: khungThanhDieuHuong.bottomAnchor),
-            khungMarketing.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            khungMarketing.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            khungMarketing.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            manHinhMarketingNhung.view.topAnchor.constraint(equalTo: khungMarketing.topAnchor),
-            manHinhMarketingNhung.view.leadingAnchor.constraint(equalTo: khungMarketing.leadingAnchor),
-            manHinhMarketingNhung.view.trailingAnchor.constraint(equalTo: khungMarketing.trailingAnchor),
-            manHinhMarketingNhung.view.bottomAnchor.constraint(equalTo: khungMarketing.bottomAnchor)
-        ])
-    }
-
     private func taoKhungMucMoRong() {
         khungMucMoRong.backgroundColor = BangMauBCTD.nenTrang
         khungMucMoRong.isHidden = true
@@ -3745,9 +3720,6 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
         case .trinhDuyet:
             manHinhTrinhDuyetNhung.capNhatNgay(ngayHienTai)
 
-        case .marketing:
-            manHinhMarketingNhung.taiCauHinhVaHienThi()
-
         default:
             capNhatNoiDungMucMoRong(mucMenuChinh)
         }
@@ -3781,8 +3753,7 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
         khungTaiKhoanHopThu.isHidden = !laCaiDat
         khungQuanTri.isHidden = (mucMenuChinh != .quanTri)
         khungTrinhDuyet.isHidden = (mucMenuChinh != .trinhDuyet)
-        khungMarketing.isHidden = (mucMenuChinh != .marketing)
-        khungMucMoRong.isHidden = (mucMenuChinh == .doSoXemSo || laManHinhNhanVien || laManHinhTonKho || mucMenuChinh == .tongQuan || mucMenuChinh == .baoCao || laCaiDat || mucMenuChinh == .quanTri || mucMenuChinh == .trinhDuyet || mucMenuChinh == .marketing)
+        khungMucMoRong.isHidden = (mucMenuChinh == .doSoXemSo || laManHinhNhanVien || laManHinhTonKho || mucMenuChinh == .tongQuan || mucMenuChinh == .baoCao || laCaiDat || mucMenuChinh == .quanTri || mucMenuChinh == .trinhDuyet)
 
         guard mucMenuChinh == .doSoXemSo || laManHinhNhanVien || laManHinhTonKho else { return }
 
@@ -3911,6 +3882,12 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
             nhanMoTaMucMoRong.text = "Chọn nhóm LINE, giờ gửi, ngày gửi và các báo cáo cần gửi tự động. Mỗi nhóm chỉ đọc dữ liệu mới nhất của đúng tài khoản DMX đã gắn."
             nganHanhDongMucMoRong.addArrangedSubview(bangGuiBaoCao)
             bangGuiBaoCao.napDuLieu()
+
+        case .truyenThongMXH:
+            nhanMoTaMucMoRong.text = "Tải ảnh sản phẩm để AI tự thiết kế poster quảng cáo bắt mắt, đề xuất 3 bài truyền thông cho Facebook, Zalo OA, TikTok để bạn chọn lựa, chỉnh sửa và duyệt đăng."
+            bangTruyenThongMXH.vcCha = self
+            nganHanhDongMucMoRong.addArrangedSubview(bangTruyenThongMXH)
+            bangTruyenThongMXH.napDuLieu()
 
         case .lichDoSo:
             let ngayStr = TienIchNgay.hienThiNgay.string(from: ngayHienTai)
