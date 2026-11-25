@@ -25,7 +25,7 @@ targets:
           - ThongTin.plist
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.thanhduong.tonghopdmx
+        PRODUCT_BUNDLE_IDENTIFIER: com.thanhduong.v2dmx
         PRODUCT_NAME: TongHopDMX
         INFOPLIST_FILE: TaiNguyen/ThongTin.plist
         CURRENT_PROJECT_VERSION: 1
@@ -35,12 +35,34 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  TongHopDMXTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: MaNguonTests
+    dependencies:
+      - target: TongHopDMX
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thanhduong.v2dmx.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TongHopDMX.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TongHopDMX"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
   TongHopDMX:
     build:
       targets:
         TongHopDMX: all
+        TongHopDMXTests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - TongHopDMXTests
     archive:
       config: Release

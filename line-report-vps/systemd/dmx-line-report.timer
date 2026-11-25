@@ -1,0 +1,11 @@
+[Unit]
+Description=Check DMX LINE report schedules every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+AccuracySec=1s
+Unit=dmx-line-report.service
+
+[Install]
+WantedBy=timers.target

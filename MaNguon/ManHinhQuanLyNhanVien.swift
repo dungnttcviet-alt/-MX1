@@ -3,12 +3,14 @@ import UIKit
 // MARK: - 1. Màn hình Quản lý Nhân viên (Thêm / Sửa / Xoá / Dán nhanh nhiều NV / Nạp 16 NV mẫu)
 
 final class ManHinhQuanLyNhanVien: UITableViewController {
-    private var danhSach = KhoDuLieu.dungChung.caiDat.danhSachNhanVien
+    private var danhSach = NhanVienQuanLy.sapXepAZ(KhoDuLieu.dungChung.caiDat.danhSachNhanVien)
     var khiLuuXong: (([NhanVienQuanLy]) -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Nhân viên (\(danhSach.count))"
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 56
         navigationItem.rightBarButtonItems = [
             UIBarButtonItem(title: "Lưu", style: .done, target: self, action: #selector(luu)),
             UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(them)),
@@ -17,18 +19,18 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
     }
 
     @objc private func moMenuTienIch() {
-        let sheet = UIAlertController(title: "Quản lý danh sách nhân viên", message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "📋 Dán nhanh nhiều nhân viên", style: .default) { [weak self] _ in
-            self?.hienDanNhanhNhanVien()
-        })
-        sheet.addAction(UIAlertAction(title: "👥 Nạp 16 NV mẫu siêu thị", style: .default) { [weak self] _ in
-            self?.napMau()
-        })
-        sheet.addAction(UIAlertAction(title: "Đóng", style: .cancel))
-        if let pop = sheet.popoverPresentationController {
-            pop.barButtonItem = navigationItem.rightBarButtonItems?.last
-        }
-        present(sheet, animated: true)
+        hienMenuChon(
+            tieuDe: "Quản lý danh sách nhân viên",
+            cacMuc: [
+                MucChonDMX(tieuDe: "📋 Dán nhanh nhiều nhân viên") { [weak self] in
+                    self?.hienDanNhanhNhanVien()
+                },
+                MucChonDMX(tieuDe: "👥 Nạp 16 NV mẫu siêu thị") { [weak self] in
+                    self?.napMau()
+                },
+                MucChonDMX(tieuDe: "Đóng", kieu: .huy)
+            ]
+        )
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -37,6 +39,13 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "NV") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "NV")
+        cell.textLabel?.numberOfLines = 0
+        cell.textLabel?.lineBreakMode = .byWordWrapping
+        cell.textLabel?.adjustsFontSizeToFitWidth = false
+        cell.detailTextLabel?.numberOfLines = 0
+        cell.detailTextLabel?.lineBreakMode = .byWordWrapping
+        cell.detailTextLabel?.adjustsFontSizeToFitWidth = false
+
         guard !danhSach.isEmpty else {
             cell.textLabel?.text = "Chưa có nhân viên nào. Hãy thêm hoặc nạp mẫu."
             cell.detailTextLabel?.text = nil
@@ -95,6 +104,7 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
             } else {
                 self.danhSach.append(moi)
             }
+            self.danhSach = NhanVienQuanLy.sapXepAZ(self.danhSach)
             self.title = "Nhân viên (\(self.danhSach.count))"
             self.tableView.reloadData()
         })
@@ -109,7 +119,7 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
             preferredStyle: .alert
         )
         hop.addTextField { tf in
-            tf.placeholder = "24939 - Phan Hoàng Sơn..."
+            tf.placeholder = "24939 - Phan Hoàng Sơn"
             if let clip = UIPasteboard.general.string, !clip.isEmpty {
                 tf.text = clip
             }
@@ -156,17 +166,19 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
                 danhSach.append(nv)
             }
         }
+        danhSach = NhanVienQuanLy.sapXepAZ(danhSach)
         title = "Nhân viên (\(danhSach.count))"
         tableView.reloadData()
     }
 
     @objc private func napMau() {
-        danhSach = CaiDatDMX.nhanVienMau
+        danhSach = NhanVienQuanLy.sapXepAZ(CaiDatDMX.nhanVienMau)
         title = "Nhân viên (\(danhSach.count))"
         tableView.reloadData()
     }
 
     @objc private func luu() {
+        danhSach = NhanVienQuanLy.sapXepAZ(danhSach)
         var cd = KhoDuLieu.dungChung.caiDat
         cd.danhSachNhanVien = danhSach
         cd.chiaTargetNganhHang = cd.chiaTargetNganhHang.mapValues { ds in
@@ -178,7 +190,7 @@ final class ManHinhQuanLyNhanVien: UITableViewController {
     }
 }
 
-// MARK: - 2. Màn hình Chia Target Mặt Hàng Cho Nhân Viên (Đồng bộ 2 chiều với Target trong Thi Đua)
+// MARK: - 2. Màn hình Chia Target Mặt Hàng Cho Nhân Viên
 
 final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableViewDelegate {
     private let ngay: Date
@@ -205,6 +217,7 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
 
     private func napLaiDanhSachMatHang() {
         caiDat = KhoDuLieu.dungChung.caiDat
+        caiDat.danhSachNhanVien = NhanVienQuanLy.sapXepAZ(caiDat.danhSachNhanVien)
         let khoaDangChonHienTai = matHangHienTai.map { KhoDuLieu.chuanHoaKhoaSoSanh($0.tenNganhHang) } ?? khoaNganhChonMacDinh
         danhSachMatHang = KhoDuLieu.dungChung.danhSachMatHangThang(den: ngay)
         if let khoa = khoaDangChonHienTai,
@@ -239,7 +252,9 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         khungTren.layer.cornerRadius = 12
 
         nutChonMatHang.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
-        nutChonMatHang.titleLabel?.numberOfLines = 2
+        nutChonMatHang.titleLabel?.numberOfLines = 0
+        nutChonMatHang.titleLabel?.lineBreakMode = .byWordWrapping
+        nutChonMatHang.titleLabel?.adjustsFontSizeToFitWidth = false
         nutChonMatHang.contentHorizontalAlignment = .left
         nutChonMatHang.backgroundColor = .systemBackground
         nutChonMatHang.tintColor = .systemBlue
@@ -251,11 +266,16 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
 
         nhanTomTat.font = .systemFont(ofSize: 13, weight: .semibold)
         nhanTomTat.textColor = .secondaryLabel
-        nhanTomTat.numberOfLines = 2
+        nhanTomTat.numberOfLines = 0
+        nhanTomTat.lineBreakMode = .byWordWrapping
+        nhanTomTat.adjustsFontSizeToFitWidth = false
 
         nutSuaTarget.setImage(UIImage(systemName: "pencil.line"), for: .normal)
         nutSuaTarget.setTitle(" Sửa Target & ĐVT (Đồng bộ Thi đua)", for: .normal)
         nutSuaTarget.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
+        nutSuaTarget.titleLabel?.numberOfLines = 0
+        nutSuaTarget.titleLabel?.lineBreakMode = .byWordWrapping
+        nutSuaTarget.titleLabel?.adjustsFontSizeToFitWidth = false
         nutSuaTarget.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.14)
         nutSuaTarget.tintColor = .systemOrange
         nutSuaTarget.layer.cornerRadius = 8
@@ -266,6 +286,9 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         nutChonHet.setImage(UIImage(systemName: "checkmark.square.fill"), for: .normal)
         nutChonHet.setTitle(" Chọn tất cả", for: .normal)
         nutChonHet.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
+        nutChonHet.titleLabel?.numberOfLines = 0
+        nutChonHet.titleLabel?.lineBreakMode = .byWordWrapping
+        nutChonHet.titleLabel?.adjustsFontSizeToFitWidth = false
         nutChonHet.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.12)
         nutChonHet.tintColor = .systemBlue
         nutChonHet.layer.cornerRadius = 8
@@ -276,6 +299,9 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
         nutBoHet.setImage(UIImage(systemName: "square"), for: .normal)
         nutBoHet.setTitle(" Bỏ chọn tất cả", for: .normal)
         nutBoHet.titleLabel?.font = .systemFont(ofSize: 12.5, weight: .bold)
+        nutBoHet.titleLabel?.numberOfLines = 0
+        nutBoHet.titleLabel?.lineBreakMode = .byWordWrapping
+        nutBoHet.titleLabel?.adjustsFontSizeToFitWidth = false
         nutBoHet.backgroundColor = UIColor.systemGray5
         nutBoHet.tintColor = .label
         nutBoHet.layer.cornerRadius = 8
@@ -295,6 +321,8 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
 
         bang.dataSource = self
         bang.delegate = self
+        bang.rowHeight = UITableView.automaticDimension
+        bang.estimatedRowHeight = 56
 
         [khungTren, bang].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
@@ -351,22 +379,22 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
 
     @objc private func bamChonMatHang() {
         guard !danhSachMatHang.isEmpty else { return }
-        let sheet = UIAlertController(title: "Chọn mặt hàng (\(danhSachMatHang.count) mặt hàng từ Thi đua)", message: nil, preferredStyle: .actionSheet)
+        var cacMuc: [MucChonDMX] = []
         for (i, mh) in danhSachMatHang.enumerated() {
             let dsChon = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: mh, trong: caiDat)
             let moiNV = dsChon.isEmpty ? 0 : mh.target / Double(dsChon.count)
             let tieuDe = "\(i + 1). \(mh.tenNganhHang) [\(mh.loaiChiTieu.maBang)] — Target: \(mh.target.chuoiSoGonVN) (\(dsChon.count) NV → \(moiNV.chuoiSoGonVN)/NV)"
-            sheet.addAction(UIAlertAction(title: tieuDe, style: .default) { [weak self] _ in
+            cacMuc.append(MucChonDMX(tieuDe: tieuDe, dangChon: i == chiSoMatHangDangChon) { [weak self] in
                 self?.chiSoMatHangDangChon = i
                 self?.capNhatGiaoDien()
             })
         }
-        sheet.addAction(UIAlertAction(title: "Đóng", style: .cancel))
-        if let pop = sheet.popoverPresentationController {
-            pop.sourceView = nutChonMatHang
-            pop.sourceRect = nutChonMatHang.bounds
-        }
-        present(sheet, animated: true)
+        cacMuc.append(MucChonDMX(tieuDe: "Đóng", kieu: .huy))
+
+        hienMenuChon(
+            tieuDe: "Chọn mặt hàng (\(danhSachMatHang.count) mặt hàng từ Thi đua)",
+            cacMuc: cacMuc
+        )
     }
 
     @objc private func bamSuaTargetMatHang() {
@@ -436,6 +464,13 @@ final class ManHinhChiaTarget: UIViewController, UITableViewDataSource, UITableV
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Chia") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "Chia")
+        cell.textLabel?.numberOfLines = 0
+        cell.textLabel?.lineBreakMode = .byWordWrapping
+        cell.textLabel?.adjustsFontSizeToFitWidth = false
+        cell.detailTextLabel?.numberOfLines = 0
+        cell.detailTextLabel?.lineBreakMode = .byWordWrapping
+        cell.detailTextLabel?.adjustsFontSizeToFitWidth = false
+
         guard let mh = matHangHienTai else { return cell }
         let nv = caiDat.danhSachNhanVien[indexPath.row]
         let ds = KhoDuLieu.dungChung.danhSachMaNVChiaTarget(cho: mh, trong: caiDat)

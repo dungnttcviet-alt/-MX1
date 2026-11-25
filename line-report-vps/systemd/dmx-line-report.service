@@ -1,0 +1,13 @@
+[Unit]
+Description=DMX scheduled LINE reports
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/dmx-line-report
+ExecStart=/usr/bin/node /opt/dmx-line-report/src/scheduler.mjs
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

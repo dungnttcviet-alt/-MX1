@@ -2,10 +2,10 @@ import UIKit
 
 final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
     private let cuon = UIScrollView()
-    private let chonCheDo = UISegmentedControl(items: ["Đăng nhập", "Tạo tài khoản mới"])
+    private let nhanTieuDe = UILabel()
+    private let nhanPhuDe = UILabel()
     private let oTen = UITextField()
     private let oMatKhau = UITextField()
-    private let oNhapLaiMatKhau = UITextField()
     private let nutThucHien = UIButton(type: .system)
     private let nhanThongBao = UILabel()
     private let vongQuay = UIActivityIndicatorView(style: .medium)
@@ -15,6 +15,7 @@ final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
         view.backgroundColor = .systemGroupedBackground
         taoGiaoDien()
         dangKySuKienBanPhim()
+        DichVuDongBo.dungChung.thucHienKhoiTaoAdminVaXoaTaiKhoanCuNeuCan()
     }
 
     deinit {
@@ -38,38 +39,55 @@ final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
         icon.preferredSymbolConfiguration = .init(pointSize: 38, weight: .bold)
         icon.heightAnchor.constraint(equalToConstant: 44).isActive = true
 
-        chonCheDo.selectedSegmentIndex = 0
-        chonCheDo.addTarget(self, action: #selector(doiCheDo), for: .valueChanged)
+        nhanTieuDe.text = "Tổng Hợp Số Liệu ĐMX"
+        nhanTieuDe.font = .systemFont(ofSize: 21, weight: .heavy)
+        nhanTieuDe.textColor = .label
+        nhanTieuDe.textAlignment = .center
+        nhanTieuDe.numberOfLines = 0
+        nhanTieuDe.lineBreakMode = .byWordWrapping
+        nhanTieuDe.adjustsFontSizeToFitWidth = false
 
-        cauHinhO(oTen, placeholder: "Tên đăng nhập (VD: sieuthi275)", secure: false, returnKey: .next)
-        cauHinhO(oMatKhau, placeholder: "Mật khẩu (tối thiểu 6 ký tự)", secure: true, returnKey: .go)
-        cauHinhO(oNhapLaiMatKhau, placeholder: "Nhập lại mật khẩu", secure: true, returnKey: .go)
-        oNhapLaiMatKhau.isHidden = true
+        nhanPhuDe.text = "Đăng nhập tài khoản để đồng bộ dữ liệu báo cáo."
+        nhanPhuDe.font = .systemFont(ofSize: 13, weight: .medium)
+        nhanPhuDe.textColor = .secondaryLabel
+        nhanPhuDe.textAlignment = .center
+        nhanPhuDe.numberOfLines = 0
+        nhanPhuDe.lineBreakMode = .byWordWrapping
+        nhanPhuDe.adjustsFontSizeToFitWidth = false
+
+        cauHinhO(oTen, placeholder: "Tên đăng nhập", secure: false, returnKey: .next)
+        cauHinhO(oMatKhau, placeholder: "Mật khẩu", secure: true, returnKey: .go)
 
         oTen.textContentType = .username
         oTen.autocapitalizationType = .none
         oTen.autocorrectionType = .no
         oMatKhau.textContentType = .password
-        oNhapLaiMatKhau.textContentType = .newPassword
 
         nutThucHien.setTitle("Đăng nhập vào hệ thống", for: .normal)
         nutThucHien.titleLabel?.font = .systemFont(ofSize: 16.5, weight: .bold)
+        nutThucHien.titleLabel?.numberOfLines = 0
+        nutThucHien.titleLabel?.lineBreakMode = .byWordWrapping
+        nutThucHien.titleLabel?.textAlignment = .center
+        nutThucHien.titleLabel?.adjustsFontSizeToFitWidth = false
         nutThucHien.backgroundColor = .systemBlue
         nutThucHien.tintColor = .white
         nutThucHien.layer.cornerRadius = 12
-        nutThucHien.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        nutThucHien.contentEdgeInsets = UIEdgeInsets(top: 10, left: 14, bottom: 10, right: 14)
+        nutThucHien.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
         nutThucHien.addTarget(self, action: #selector(thucHien), for: .touchUpInside)
 
         nhanThongBao.font = .systemFont(ofSize: 13, weight: .semibold)
         nhanThongBao.textColor = .systemRed
         nhanThongBao.numberOfLines = 0
+        nhanThongBao.lineBreakMode = .byWordWrapping
+        nhanThongBao.adjustsFontSizeToFitWidth = false
         nhanThongBao.textAlignment = .center
 
         let hangNut = UIStackView(arrangedSubviews: [nutThucHien, vongQuay])
         hangNut.axis = .vertical
         hangNut.spacing = 10
 
-        let khung = UIStackView(arrangedSubviews: [icon, chonCheDo, oTen, oMatKhau, oNhapLaiMatKhau, hangNut, nhanThongBao])
+        let khung = UIStackView(arrangedSubviews: [icon, nhanTieuDe, nhanPhuDe, oTen, oMatKhau, hangNut, nhanThongBao])
         khung.axis = .vertical
         khung.spacing = 14
         khung.alignment = .fill
@@ -87,10 +105,8 @@ final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
             khung.leadingAnchor.constraint(equalTo: cuon.frameLayoutGuide.leadingAnchor, constant: 24),
             khung.trailingAnchor.constraint(equalTo: cuon.frameLayoutGuide.trailingAnchor, constant: -24),
 
-            chonCheDo.heightAnchor.constraint(equalToConstant: 36),
             oTen.heightAnchor.constraint(equalToConstant: 46),
-            oMatKhau.heightAnchor.constraint(equalToConstant: 46),
-            oNhapLaiMatKhau.heightAnchor.constraint(equalToConstant: 46)
+            oMatKhau.heightAnchor.constraint(equalToConstant: 46)
         ])
     }
 
@@ -142,32 +158,16 @@ final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         if textField === oTen {
             oMatKhau.becomeFirstResponder()
-        } else if textField === oMatKhau {
-            if chonCheDo.selectedSegmentIndex == 1 {
-                oNhapLaiMatKhau.becomeFirstResponder()
-            } else {
-                thucHien()
-            }
         } else {
             thucHien()
         }
         return true
     }
 
-    @objc private func doiCheDo() {
-        let laDangKy = (chonCheDo.selectedSegmentIndex == 1)
-        oNhapLaiMatKhau.isHidden = !laDangKy
-        oMatKhau.returnKeyType = laDangKy ? .next : .go
-        nutThucHien.setTitle(laDangKy ? "Tạo tài khoản & Bắt đầu" : "Đăng nhập vào hệ thống", for: .normal)
-        nhanThongBao.text = ""
-    }
-
     @objc private func thucHien() {
         view.endEditing(true)
         let ten = (oTen.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let matKhau = oMatKhau.text ?? ""
-        let nhapLai = oNhapLaiMatKhau.text ?? ""
-        let laDangKy = (chonCheDo.selectedSegmentIndex == 1)
 
         if ten.range(of: "^[a-z0-9][a-z0-9._-]{2,39}$", options: .regularExpression) == nil {
             nhanThongBao.text = "Tên đăng nhập gồm 3–40 ký tự: chữ thường, số, dấu chấm, gạch ngang hoặc gạch dưới."
@@ -177,13 +177,9 @@ final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
             nhanThongBao.text = "Mật khẩu cần có ít nhất 6 ký tự."
             return
         }
-        if laDangKy && matKhau != nhapLai {
-            nhanThongBao.text = "Mật khẩu nhập lại chưa khớp."
-            return
-        }
 
         datDangTai(true)
-        let xong: (Result<Void, Error>) -> Void = { [weak self] ketQua in
+        DichVuDongBo.dungChung.dangNhap(tenDangNhap: ten, matKhau: matKhau) { [weak self] ketQua in
             self?.datDangTai(false)
             switch ketQua {
             case .success:
@@ -192,19 +188,13 @@ final class ManHinhDangNhap: UIViewController, UITextFieldDelegate {
                 self?.nhanThongBao.text = loi.localizedDescription
             }
         }
-        if !laDangKy {
-            DichVuDongBo.dungChung.dangNhap(tenDangNhap: ten, matKhau: matKhau, hoanTat: xong)
-        } else {
-            DichVuDongBo.dungChung.dangKy(tenDangNhap: ten, matKhau: matKhau, hoanTat: xong)
-        }
     }
 
     private func datDangTai(_ dangTai: Bool) {
         nutThucHien.isEnabled = !dangTai
-        chonCheDo.isEnabled = !dangTai
         dangTai ? vongQuay.startAnimating() : vongQuay.stopAnimating()
         if dangTai {
-            nhanThongBao.text = "Đang kết nối tài khoản ĐMX..."
+            nhanThongBao.text = "Đang kết nối tài khoản ĐMX"
             nhanThongBao.textColor = .secondaryLabel
         } else {
             nhanThongBao.textColor = .systemRed
