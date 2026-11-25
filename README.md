@@ -8,7 +8,7 @@
 
 | Thành phần | Thư mục | Công nghệ | Vai trò |
 | :--- | :--- | :--- | :--- |
-| **Ứng dụng iOS** | `MaNguon/` (21 tệp Swift) | iOS 16.0+, Swift 5, UIKit thuần, XcodeGen | Quét ảnh OCR/Gemini, tính KPI & sức khỏe NV, quản lý tồn kho, xuất ảnh/CSV/XLSX/PPTX |
+| **Ứng dụng iOS** | `MaNguon/` (23 tệp Swift) | iOS 16.0+, Swift 5, UIKit thuần, XcodeGen | Quét ảnh OCR/Gemini, tính KPI & sức khỏe NV, quản lý tồn kho, xuất ảnh/CSV/XLSX/PPTX |
 | **Kiểm thử tự động** | `MaNguonTests/` | XCTest | Kiểm thử đơn vị cho mô hình dữ liệu, công thức KPI và chuẩn hóa tên ngành hàng |
 | **Cloudflare Worker** | `cloudflare/` | Cloudflare Workers, R2 (`dmx-anh-bao-cao`), Cron | Webhook LINE Bot, lưu ảnh báo cáo R2, đẩy báo cáo định kỳ |
 | **Dịch vụ VPS LINE** | `line-report-vps/` | Node.js ESM, `@evex-dev/linejs`, systemd | Kênh gửi báo cáo định kỳ dự phòng qua tài khoản LINE |
@@ -29,6 +29,8 @@
 | | `ManHinhDieuChinhTargetThiDua.swift` | Điều chỉnh target từng môn thi đua |
 | **Nhân sự & Quản trị** | `ManHinhNhanVien.swift` | Bảng xếp hạng NV, chi tiết ngành hàng theo NV, báo cáo sức khỏe cá nhân |
 | | `ManHinhQuanLyNhanVien.swift` | Thêm/sửa/xóa NV, nhập nhanh danh sách, chia target mặt hàng |
+| | `DichVuDaoTao.swift` | Mô hình phiếu kèm cặp 1-1, gợi ý Mentor theo ngành hàng và đo hiệu quả Trước/Sau từ dữ liệu thực |
+| | `ManHinhDaoTaoHuanLuyen.swift` | Trung tâm Đào tạo & Huấn luyện nhân sự, form lập phiếu 1-1 và xuất ảnh báo cáo |
 | | `ManHinhDangNhap.swift` | Đăng nhập nội bộ |
 | | `ManHinhCaiDat.swift` | Cài đặt hiển thị, lọc cụm từ, quản trị tài khoản Admin |
 | **Tồn kho, Bản tin & Báo cáo** | `ManHinhTonKho.swift` | Theo dõi tồn kho & đồng bộ Google Sheets |

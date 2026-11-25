@@ -2983,6 +2983,12 @@ final class ManHinhChinh: UIViewController, PHPickerViewControllerDelegate, UIDo
 
         menuBenTrai.khiChonMucChinh = { [weak self] muc in
             guard let self = self else { return }
+            if muc == .daoTaoHuanLuyen {
+                self.anMenu(animated: true)
+                let vc = ManHinhDaoTaoHuanLuyen(ngay: self.ngayHienTai, cheDo: self.cheDoDoanhThu)
+                self.navigationController?.pushViewController(vc, animated: true)
+                return
+            }
             self.mucMenuChinh = muc
             if muc == .doSoXemSo {
                 self.mucConDoSo = .xemSo

@@ -4230,12 +4230,24 @@ final class ManHinhChiTietNhanVien: UIViewController, PHPickerViewControllerDele
             target: self,
             action: #selector(bamQuetAnhSucKhoeNV)
         )
-        navigationItem.rightBarButtonItems = [nutChiaSe, nutQuetAnh]
+        let nutDaoTao = UIBarButtonItem(
+            image: UIImage(systemName: "graduationcap.fill"),
+            style: .plain,
+            target: self,
+            action: #selector(bamMoDaoTaoNV)
+        )
+        nutDaoTao.accessibilityLabel = "Đào tạo & Kèm cặp"
+        navigationItem.rightBarButtonItems = [nutChiaSe, nutQuetAnh, nutDaoTao]
         taoGiaoDien()
     }
 
     private func capNhatTieuDe() {
         title = "Sức khỏe: \(tongHop.nhanVien.hoTen)"
+    }
+
+    @objc private func bamMoDaoTaoNV() {
+        let vc = ManHinhDaoTaoHuanLuyen(ngay: ngay, cheDo: cheDo, locTheoMaNV: tongHop.nhanVien.maNV)
+        navigationController?.pushViewController(vc, animated: true)
     }
 
     private func taoGiaoDien() {

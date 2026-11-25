@@ -288,9 +288,10 @@ enum MucMenuChinh: Int, CaseIterable {
     case nhanVien = 15
     case guiBaoCao = 16
     case tonKho = 17
+    case daoTaoHuanLuyen = 18
 
     static var allCases: [MucMenuChinh] {
-        [.tongQuan, .doSoXemSo, .nhanVien, .tonKho, .guiBaoCao, .xuatFileBaoCao, .caiDat, .quanTri]
+        [.tongQuan, .doSoXemSo, .nhanVien, .daoTaoHuanLuyen, .tonKho, .guiBaoCao, .xuatFileBaoCao, .caiDat, .quanTri]
     }
 
     var tieuDe: String {
@@ -313,6 +314,7 @@ enum MucMenuChinh: Int, CaseIterable {
         case .nhanVien: return "Nhân viên"
         case .guiBaoCao: return "Gởi báo cáo"
         case .tonKho: return "Lọc dữ liệu tồn kho"
+        case .daoTaoHuanLuyen: return "Đào tạo & Huấn luyện"
         }
     }
 
@@ -336,6 +338,7 @@ enum MucMenuChinh: Int, CaseIterable {
         case .nhanVien: return "person.3.fill"
         case .guiBaoCao: return "paperplane.fill"
         case .tonKho: return "shippingbox.fill"
+        case .daoTaoHuanLuyen: return "graduationcap.fill"
         }
     }
 
@@ -1292,6 +1295,7 @@ struct CaiDatDMX: Codable {
     var geminiModel: String = CaiDatDMX.geminiModelMacDinh
     var dungGeminiQuetAnh: Bool = false
     var hienThiNangSuatNhanVien: Bool = true
+    var nhatKyDaoTao: [PhienKemCapNhanVien] = []
 
     enum CodingKeys: String, CodingKey {
         case kieuHienThi
@@ -1311,6 +1315,7 @@ struct CaiDatDMX: Codable {
         case geminiModel
         case dungGeminiQuetAnh
         case hienThiNangSuatNhanVien
+        case nhatKyDaoTao
     }
 
     static let nhanVienMau: [NhanVienQuanLy] = [
@@ -1350,7 +1355,8 @@ struct CaiDatDMX: Codable {
         geminiApiKey3: String = "",
         geminiModel: String = CaiDatDMX.geminiModelMacDinh,
         dungGeminiQuetAnh: Bool = false,
-        hienThiNangSuatNhanVien: Bool = true
+        hienThiNangSuatNhanVien: Bool = true,
+        nhatKyDaoTao: [PhienKemCapNhanVien] = []
     ) {
         self.kieuHienThi = kieuHienThi
         self.phuongPhapQuetThiDua = phuongPhapQuetThiDua
@@ -1378,6 +1384,7 @@ struct CaiDatDMX: Codable {
         self.geminiModel = Self.geminiModelMacDinh
         self.dungGeminiQuetAnh = dungGeminiQuetAnh
         self.hienThiNangSuatNhanVien = hienThiNangSuatNhanVien
+        self.nhatKyDaoTao = nhatKyDaoTao
     }
 
     init(from decoder: Decoder) throws {
@@ -1436,6 +1443,7 @@ struct CaiDatDMX: Codable {
         } else {
             hienThiNangSuatNhanVien = true
         }
+        nhatKyDaoTao = (try? c.decode([PhienKemCapNhanVien].self, forKey: .nhatKyDaoTao)) ?? []
     }
 
     /// Danh sách các Key do người dùng tự nhập ở 3 ô (nếu nhập 1 có 1, nhập 2 có 2, nhập 3 có 3)
@@ -5068,6 +5076,13 @@ final class KhoDuLieu {
     }
 
     /// Phân tích Sức khỏe Nhân viên toàn đội (~16 NV) và phát hiện Top 5 nhân viên yếu nhiều ngày liên tục
+    /// Trả về toàn bộ khóa ngày (yyyy-MM-dd) hiện có dữ liệu trong kho, đã sắp xếp tăng dần
+    func tatCaKhoaNgayCoDuLieu() -> [String] {
+        khoaTruyCap.lock()
+        defer { khoaTruyCap.unlock() }
+        return Array(cacNgay.keys).sorted()
+    }
+
     func tinhBaoCaoSucKhoeNhanVien(
         den ngay: Date,
         cheDo: LoaiCheDoDoanhThu = .luyKe
